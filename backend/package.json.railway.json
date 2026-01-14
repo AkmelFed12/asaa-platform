@@ -1,0 +1,8 @@
+{
+  "name": "asaa-backend",
+  "description": "ASAA Platform Backend API",
+  "keywords": ["nodejs", "express", "api"],
+  "buildpacks": [
+    "heroku/nodejs"
+  ]
+}

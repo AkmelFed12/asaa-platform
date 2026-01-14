@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASAA Platform - Accès</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1d5c2a 0%, #2d7a3a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1d5c2a 0%, #2d7a3a 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section h2 {
+            color: #1d5c2a;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #2d7a3a;
+            padding-bottom: 10px;
+        }
+        
+        .section-content {
+            background: #f0f9f6;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #1d5c2a;
+        }
+        
+        .link-box {
+            background: white;
+            border: 2px dashed #2d7a3a;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .link-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .link {
+            color: #0066cc;
+            font-size: 1.1rem;
+            font-weight: 600;
+            word-break: break-all;
+            text-decoration: none;
+        }
+        
+        .link:hover {
+            text-decoration: underline;
+        }
+        
+        .credentials {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .credential-box {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+        }
+        
+        .credential-box h3 {
+            color: #1d5c2a;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+        
+        .credential-item {
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .credential-item label {
+            color: #666;
+            display: block;
+            font-weight: 600;
+        }
+        
+        .credential-item value {
+            color: #333;
+            font-family: monospace;
+            display: block;
+            padding: 5px 0;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .feature {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+        
+        .feature:before {
+            content: "✓ ";
+            color: #27ae60;
+            font-weight: 700;
+        }
+        
+        .president {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border: 2px solid #ff9800;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .president h3 {
+            color: #ff9800;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .president-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1d5c2a 0%, #2d7a3a 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 92, 42, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f0f9f6;
+            color: #1d5c2a;
+            border: 2px solid #1d5c2a;
+        }
+        
+        .btn-secondary:hover {
+            background: #1d5c2a;
+            color: white;
+        }
+        
+        .footer {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .copy-notice {
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 10px;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #1d5c2a;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: all 0.3s;
+        }
+        
+        .password-input:focus {
+            outline: none;
+            border-color: #2d7a3a;
+            box-shadow: 0 0 10px rgba(29, 92, 42, 0.2);
+        }
+        
+        .password-input::placeholder {
+            color: #aaa;
+        }
+        
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .credentials {
+                grid-template-columns: 1fr;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌟 ASAA Platform</h1>
+            <p>Association des Serviteurs d'Allah Azawajal</p>
+        </div>
+        
+        <div class="content">
+            <!-- Président Section -->
+            <div class="section">
+                <div class="president">
+                    <h3>👨‍💼 Président</h3>
+                    <div class="president-name">DIARRA SIDI</div>
+                </div>
+            </div>
+            
+            <!-- Accès Public -->
+            <div class="section" id="accessSection">
+                <h2>🌐 Accès Public</h2>
+                <div class="section-content">
+                    <div id="passwordPrompt">
+                        <div class="link-box">
+                            <div class="link-label">Entrez le mot de passe:</div>
+                            <input type="password" id="tunnelPassword" placeholder="Mot de passe" class="password-input">
+                            <button onclick="verifyPassword()" class="btn btn-primary" style="margin-top: 10px; width: 100%;">
+                                Accéder →
+                            </button>
+                        </div>
+                    </div>
+                    <div id="accessContent" style="display: none;">
+                        <div class="link-box">
+                            <div class="link-label">Cliquez pour accéder:</div>
+                            <a href="https://mighty-cups-poke.loca.lt" class="link">
+                                https://mighty-cups-poke.loca.lt
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Identifiants -->
+            <div class="section">
+                <h2>🔑 Identifiants</h2>
+                <div class="section-content">
+                    <div class="credentials">
+                        <div class="credential-box">
+                            <h3>👨‍💼 Admin</h3>
+                            <div class="credential-item">
+                                <label>Email:</label>
+                                <value>admin@asaa.com</value>
+                            </div>
+                            <div class="credential-item">
+                                <label>Mot de passe:</label>
+                                <value>admin123</value>
+                            </div>
+                        </div>
+                        <div class="credential-box">
+                            <h3>👥 Membre</h3>
+                            <div class="credential-item">
+                                <label>Email:</label>
+                                <value>member@asaa.com</value>
+                            </div>
+                            <div class="credential-item">
+                                <label>Mot de passe:</label>
+                                <value>member123</value>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Fonctionnalités -->
+            <div class="section">
+                <h2>✨ Fonctionnalités</h2>
+                <div class="section-content">
+                    <div class="features">
+                        <div class="feature">📋 Gouvernance</div>
+                        <div class="feature">📚 Quiz Islamique</div>
+                        <div class="feature">🏆 Classement</div>
+                        <div class="feature">⚙️ Admin Panel</div>
+                        <div class="feature">📱 Mobile Ready</div>
+                        <div class="feature">🔐 HTTPS</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Accès Local -->
+            <div class="section">
+                <h2>🏠 Accès Local (Même Réseau)</h2>
+                <div class="section-content">
+                    <div class="link-box">
+                        <div class="link-label">Frontend:</div>
+                        <a href="http://192.168.1.127:3000" class="link">
+                            http://192.168.1.127:3000
+                        </a>
+                    </div>
+                    <div class="link-box">
+                        <div class="link-label">Backend API:</div>
+                        <a href="http://192.168.1.127:5000" class="link">
+                            http://192.168.1.127:5000
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Boutons d'Action -->
+            <div class="button-group" id="buttonGroup">
+                <a href="https://mighty-cups-poke.loca.lt" class="btn btn-primary" id="accessButton" style="display: none;">
+                    Ouvrir l'Application →
+                </a>
+                <button class="btn btn-secondary" onclick="copyLink()" id="copyButton" style="display: none;">
+                    📋 Copier le Lien
+                </button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Platform ASAA - 13 Janvier 2026</p>
+            <p class="copy-notice">Accessible de partout sur Internet</p>
+        </div>
+    </div>
+    
+    <script>
+        // Tunnel password (change this to your desired password)
+        const TUNNEL_PASSWORD = 'asaa2026';
+        
+        function verifyPassword() {
+            const input = document.getElementById('tunnelPassword');
+            const password = input.value;
+            
+            if (password === TUNNEL_PASSWORD) {
+                // Hide password prompt
+                document.getElementById('passwordPrompt').style.display = 'none';
+                // Show access content
+                document.getElementById('accessContent').style.display = 'block';
+                // Show buttons
+                document.getElementById('accessButton').style.display = 'inline-block';
+                document.getElementById('copyButton').style.display = 'inline-block';
+                // Store in session
+                sessionStorage.setItem('asaa-tunnel-authenticated', 'true');
+            } else {
+                input.style.borderColor = '#d32f2f';
+                input.style.backgroundColor = '#ffebee';
+                alert('❌ Mot de passe incorrect. Essayez de nouveau.');
+                input.value = '';
+                input.focus();
+            }
+        }
+        
+        function copyLink() {
+            const link = 'https://mighty-cups-poke.loca.lt';
+            navigator.clipboard.writeText(link).then(() => {
+                alert('✅ Lien copié: ' + link);
+            }).catch(() => {
+                prompt('Copiez ce lien:', link);
+            });
+        }
+        
+        // Allow Enter key to verify password
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInput = document.getElementById('tunnelPassword');
+            if (passwordInput) {
+                passwordInput.addEventListener('keypress', function(event) {
+                    if (event.key === 'Enter') {
+                        verifyPassword();
+                    }
+                });
+                // Check if already authenticated in this session
+                if (sessionStorage.getItem('asaa-tunnel-authenticated') === 'true') {
+                    document.getElementById('passwordPrompt').style.display = 'none';
+                    document.getElementById('accessContent').style.display = 'block';
+                    document.getElementById('accessButton').style.display = 'inline-block';
+                    document.getElementById('copyButton').style.display = 'inline-block';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

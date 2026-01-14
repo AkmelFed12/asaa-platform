@@ -1,0 +1,28 @@
+{
+  "name": "asaa-application",
+  "version": "1.0.0",
+  "description": "Application de gestion pour ASAA - Association Islamique avec structure de gouvernance",
+  "main": "backend/index.js",
+  "scripts": {
+    "start": "npm run start:backend & npm run start:frontend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test"
+  },
+  "keywords": [
+    "asaa",
+    "association",
+    "islamique",
+    "fullstack",
+    "nodejs",
+    "react",
+    "postgresql"
+  ],
+  "author": "ASAA",
+  "license": "MIT"
+}
