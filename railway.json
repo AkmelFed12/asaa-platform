@@ -1,7 +1,15 @@
 {
-  "name": "asaa-app",
-  "version": "1.0.0",
-  "engines": {
-    "node": "18.x"
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "dockerfile": "backend/Dockerfile",
+    "context": "."
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "restartPolicyMaxRetries": 5
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "5000"
   }
 }
