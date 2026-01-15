@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { sendEventNotification } = require('../utils/emailService');
+const websocketManager = require('../utils/websocketManager');
 
 // In-memory storage
 let events = [];
@@ -35,6 +37,34 @@ router.post('/', verifyAdmin, (req, res) => {
   };
 
   events.push(newEvent);
+  
+  // Broadcast event creation via WebSocket
+  try {
+    websocketManager.broadcastToAll('EVENT_CREATED', {
+      id: newEvent.id,
+      title: newEvent.title,
+      date: newEvent.date,
+      location: newEvent.location
+    });
+  } catch (error) {
+    console.error('WebSocket broadcast error:', error.message);
+  }
+  
+  // Send event notification emails (in production, would send to all subscribed users)
+  try {
+    sendEventNotification('notifications@asaa.com', 'ASAA Members', {
+      title: newEvent.title,
+      description: newEvent.description,
+      date: newEvent.date.toLocaleString('fr-FR'),
+      location: newEvent.location,
+      image: newEvent.image
+    })
+      .then(() => console.log(`✉️  Event notification sent for: ${newEvent.title}`))
+      .catch(err => console.error('Email error:', err.message));
+  } catch (error) {
+    console.error('Email service error:', error.message);
+  }
+  
   res.json(newEvent);
 });
 

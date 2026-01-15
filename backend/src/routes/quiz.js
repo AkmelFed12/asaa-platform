@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { generateDailyQuestions, calculateLevel } = require('../utils/quizEngine');
+const { sendQuizNotification } = require('../utils/emailService');
+const websocketManager = require('../utils/websocketManager');
 
 // In-memory storage for daily quiz
 let dailyQuiz = {
@@ -470,6 +472,34 @@ router.post('/daily/complete', (req, res) => {
   });
   
   const rank = dailyQuiz.leaderboard.findIndex(l => l.userId === userId) + 1;
+  
+  // Send completion email
+  try {
+    sendQuizNotification(attempt.email, attempt.name, {
+      score: attempt.score,
+      total: dailyQuiz.questions.length,
+      percentage: attempt.percentage,
+      level: attempt.level,
+      rank
+    })
+      .then(() => console.log(`✉️  Quiz result email sent to ${attempt.email}`))
+      .catch(err => console.error('Email error:', err.message));
+  } catch (error) {
+    console.error('Email service error:', error.message);
+  }
+  
+  // Broadcast leaderboard update via WebSocket
+  try {
+    websocketManager.broadcastToRoom('leaderboard-daily', 'LEADERBOARD_UPDATE', {
+      rank,
+      name: attempt.name,
+      score: attempt.score,
+      percentage: attempt.percentage,
+      level: attempt.level
+    });
+  } catch (error) {
+    console.error('WebSocket broadcast error:', error.message);
+  }
   
   res.json({
     success: true,

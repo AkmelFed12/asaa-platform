@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const http = require('http');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -11,14 +13,26 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server for WebSocket
+const server = http.createServer(app);
+
+// WebSocket Manager
+const websocketManager = require('./src/utils/websocketManager');
+websocketManager.initialize(server);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'Server is running', 
     timestamp: new Date().toISOString(),
-    service: 'ASAA API'
+    service: 'ASAA API',
+    websocket: 'enabled',
+    uploads: 'enabled'
   });
 });
 
@@ -31,6 +45,7 @@ app.use('/api/delegations', require('./src/routes/delegations'));
 app.use('/api/roles', require('./src/routes/roles'));
 app.use('/api/governance', require('./src/routes/governance'));
 app.use('/api/quiz', require('./src/routes/quiz'));
+app.use('/api/photos', require('./src/routes/photos'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -46,8 +61,11 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`ASAA Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 ASAA Server running on port ${PORT}`);
+  console.log(`📧 Email notifications: enabled`);
+  console.log(`🔄 WebSocket: enabled`);
+  console.log(`📸 Photo uploads: enabled`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 

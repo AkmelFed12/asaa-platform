@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { sendWelcomeEmail } = require('../utils/emailService');
 
 // Get all users
 router.get('/', (req, res) => {
@@ -27,9 +28,20 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Username and email required' });
   }
   
+  const tempPassword = Math.random().toString(36).slice(-8);
+  
+  // Send welcome email
+  try {
+    sendWelcomeEmail(email, first_name || username, tempPassword)
+      .then(() => console.log(`✉️  Welcome email sent to ${email}`))
+      .catch(err => console.error('Email error:', err.message));
+  } catch (error) {
+    console.error('Email service error:', error.message);
+  }
+  
   res.status(201).json({ 
     message: 'User created successfully',
-    data: { username, email, first_name, last_name, role: role || 'membre' }
+    data: { username, email, first_name, last_name, role: role || 'membre', tempPassword }
   });
 });
 
