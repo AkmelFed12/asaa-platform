@@ -1,7 +1,56 @@
 const express = require('express');
 const router = express.Router();
+const { generateDailyQuestions, calculateLevel } = require('../utils/quizEngine');
 
-// Questions du quiz (20 questions)
+// In-memory storage for daily quiz
+let dailyQuiz = {
+  date: new Date().toISOString().split('T')[0],
+  questions: [],
+  attempts: {},
+  leaderboard: []
+};
+
+// Initialize daily quiz on startup
+function initializeDailyQuiz() {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  
+  if (dailyQuiz.date !== today) {
+    dailyQuiz = {
+      date: today,
+      questions: generateDailyQuestions(),
+      attempts: {},
+      leaderboard: []
+    };
+    console.log(`[${today} 20:00] New daily quiz generated with 20 questions`);
+  }
+}
+
+// Schedule quiz reset at 20:00 every day
+function scheduleQuizReset() {
+  const now = new Date();
+  let nextReset = new Date(now);
+  nextReset.setHours(20, 0, 0, 0);
+  
+  if (nextReset <= now) {
+    nextReset.setDate(nextReset.getDate() + 1);
+  }
+  
+  const timeUntilReset = nextReset - now;
+  
+  setTimeout(() => {
+    initializeDailyQuiz();
+    scheduleQuizReset();
+  }, timeUntilReset);
+  
+  console.log(`Quiz reset scheduled for ${nextReset.toISOString()}`);
+}
+
+// Initialize on startup
+initializeDailyQuiz();
+scheduleQuizReset();
+
+// Legacy questions for backward compatibility
 const quizQuestions = [
   {
     id: 1,
@@ -292,4 +341,192 @@ router.get('/history/:user_id', (req, res) => {
   });
 });
 
+// === NEW DAILY QUIZ ENDPOINTS ===
+
+// GET: Today's quiz (10 seconds per question)
+router.get('/daily/quiz', (req, res) => {
+  if (dailyQuiz.questions.length === 0) {
+    initializeDailyQuiz();
+  }
+  
+  const questionsWithoutAnswers = dailyQuiz.questions.map((q, idx) => ({
+    index: idx,
+    question: q.question,
+    options: q.options,
+    difficulty: q.difficulty
+  }));
+  
+  res.json({
+    success: true,
+    date: dailyQuiz.date,
+    totalQuestions: 20,
+    timePerQuestion: 10,
+    questions: questionsWithoutAnswers
+  });
+});
+
+// POST: Start daily quiz attempt
+router.post('/daily/start', (req, res) => {
+  const { userId, email, name } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+  
+  const attemptId = `attempt_${userId}_${Date.now()}`;
+  
+  dailyQuiz.attempts[userId] = {
+    attemptId,
+    userId,
+    email,
+    name,
+    startTime: new Date(),
+    answers: [],
+    score: 0,
+    completed: false
+  };
+  
+  res.json({
+    success: true,
+    attemptId,
+    message: 'Quiz started - 10 seconds per question'
+  });
+});
+
+// POST: Submit answer to daily quiz
+router.post('/daily/answer', (req, res) => {
+  const { userId, questionIndex, selectedIndex, timeSpent } = req.body;
+  
+  if (!dailyQuiz.attempts[userId]) {
+    return res.status(400).json({ error: 'Quiz not started' });
+  }
+  
+  if (questionIndex < 0 || questionIndex >= dailyQuiz.questions.length) {
+    return res.status(400).json({ error: 'Invalid question' });
+  }
+  
+  const attempt = dailyQuiz.attempts[userId];
+  const question = dailyQuiz.questions[questionIndex];
+  const isCorrect = selectedIndex === question.correct;
+  
+  attempt.answers.push({
+    questionIndex,
+    selectedIndex,
+    isCorrect,
+    timeSpent,
+    questionText: question.question
+  });
+  
+  if (isCorrect) {
+    attempt.score++;
+  }
+  
+  res.json({
+    success: true,
+    isCorrect,
+    correctIndex: question.correct,
+    currentScore: attempt.score,
+    totalQuestions: dailyQuiz.questions.length
+  });
+});
+
+// POST: Complete daily quiz
+router.post('/daily/complete', (req, res) => {
+  const { userId } = req.body;
+  
+  if (!dailyQuiz.attempts[userId]) {
+    return res.status(400).json({ error: 'Quiz not started' });
+  }
+  
+  const attempt = dailyQuiz.attempts[userId];
+  attempt.completed = true;
+  attempt.completionTime = new Date();
+  attempt.percentage = Math.round((attempt.score / dailyQuiz.questions.length) * 100);
+  attempt.level = calculateLevel(attempt.score);
+  
+  // Add to leaderboard
+  const existingIndex = dailyQuiz.leaderboard.findIndex(l => l.userId === userId);
+  
+  const leaderboardEntry = {
+    userId,
+    name: attempt.name,
+    email: attempt.email,
+    score: attempt.score,
+    percentage: attempt.percentage,
+    level: attempt.level,
+    completionTime: attempt.completionTime
+  };
+  
+  if (existingIndex !== -1) {
+    dailyQuiz.leaderboard[existingIndex] = leaderboardEntry;
+  } else {
+    dailyQuiz.leaderboard.push(leaderboardEntry);
+  }
+  
+  // Sort leaderboard
+  dailyQuiz.leaderboard.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.completionTime - b.completionTime;
+  });
+  
+  const rank = dailyQuiz.leaderboard.findIndex(l => l.userId === userId) + 1;
+  
+  res.json({
+    success: true,
+    message: 'Quiz completed successfully',
+    score: attempt.score,
+    totalQuestions: dailyQuiz.questions.length,
+    percentage: attempt.percentage,
+    level: attempt.level,
+    rank,
+    totalParticipants: dailyQuiz.leaderboard.length
+  });
+});
+
+// GET: Daily leaderboard
+router.get('/daily/leaderboard', (req, res) => {
+  const leaderboard = dailyQuiz.leaderboard
+    .slice(0, 100)
+    .map((entry, index) => ({
+      rank: index + 1,
+      name: entry.name,
+      score: entry.score,
+      percentage: entry.percentage,
+      level: entry.level
+    }));
+  
+  res.json({
+    success: true,
+    date: dailyQuiz.date,
+    leaderboard,
+    totalParticipants: dailyQuiz.leaderboard.length,
+    quizStartTime: '20:00',
+    nextQuizTime: '20:00 tomorrow'
+  });
+});
+
+// GET: User's daily result
+router.get('/daily/result/:userId', (req, res) => {
+  const { userId } = req.params;
+  const attempt = dailyQuiz.attempts[userId];
+  
+  if (!attempt || !attempt.completed) {
+    return res.status(404).json({ error: 'Quiz not completed' });
+  }
+  
+  const rank = dailyQuiz.leaderboard.findIndex(l => l.userId === userId) + 1;
+  
+  res.json({
+    success: true,
+    score: attempt.score,
+    totalQuestions: dailyQuiz.questions.length,
+    percentage: attempt.percentage,
+    level: attempt.level,
+    rank,
+    date: dailyQuiz.date,
+    answers: attempt.answers
+  });
+});
+
 module.exports = router;
+
