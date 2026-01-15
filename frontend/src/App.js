@@ -3,6 +3,10 @@ import './App.css';
 import Auth from './components/Auth';
 import Governance from './components/Governance';
 import Quiz from './components/Quiz';
+import QuizNew from './components/QuizNew';
+import Events from './components/Events';
+import Admin from './components/Admin';
+import Footer from './components/Footer';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -54,16 +58,22 @@ function App() {
           Accueil
         </button>
         <button 
-          className={`nav-btn ${currentPage === 'governance' ? 'active' : ''}`}
-          onClick={() => setCurrentPage('governance')}
-        >
-          Structure de Gouvernance
-        </button>
-        <button 
           className={`nav-btn ${currentPage === 'quiz' ? 'active' : ''}`}
           onClick={() => setCurrentPage('quiz')}
         >
-          Quiz Islamique
+          📚 Quiz Quotidien
+        </button>
+        <button 
+          className={`nav-btn ${currentPage === 'events' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('events')}
+        >
+          📅 Événements
+        </button>
+        <button 
+          className={`nav-btn ${currentPage === 'governance' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('governance')}
+        >
+          Gouvernance
         </button>
         {user.role === 'admin' && (
           <button 
@@ -111,31 +121,19 @@ function App() {
         )}
 
         {currentPage === 'quiz' && (
-          <Quiz userId={user.id} />
+          <QuizNew userId={user.id} />
+        )}
+
+        {currentPage === 'events' && (
+          <Events isAdmin={user.role === 'admin'} />
         )}
 
         {currentPage === 'admin' && user.role === 'admin' && (
-          <section className="admin-section">
-            <h2>Panneau d'Administration</h2>
-            <p>Bienvenue administrateur {user.first_name}!</p>
-            <div className="admin-options">
-              <button onClick={() => setCurrentPage('governance')} className="admin-option-btn">
-                ➜ Gérer la Gouvernance
-              </button>
-              <button className="admin-option-btn" disabled>
-                ➜ Gérer les Utilisateurs (À venir)
-              </button>
-              <button className="admin-option-btn" disabled>
-                ➜ Consulter les Rapports (À venir)
-              </button>
-            </div>
-          </section>
+          <Admin isAdmin={true} />
         )}
       </main>
 
-      <footer className="App-footer">
-        <p>&copy; 2024 ASAA - Association des Serviteurs d'Allah Azawajal. Tous droits réservés.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
