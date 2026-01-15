@@ -1,24 +1,27 @@
 .quiz-container {
-  padding: 20px;
   max-width: 900px;
   margin: 0 auto;
+  padding: 20px;
 }
 
-.quiz-start {
+.quiz-header {
   text-align: center;
-  padding: 60px 20px;
-}
-
-.quiz-start h1 {
-  color: #1d5c2a;
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-}
-
-.quiz-start .subtitle {
-  color: #666;
   margin-bottom: 40px;
-  font-size: 0.95rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 40px 20px;
+  border-radius: 10px;
+}
+
+.quiz-header h2 {
+  font-size: 2.5em;
+  margin: 0 0 10px 0;
+}
+
+.quiz-header p {
+  font-size: 1.1em;
+  margin: 0;
+  opacity: 0.9;
 }
 
 .quiz-info {
