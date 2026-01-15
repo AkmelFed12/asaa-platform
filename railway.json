@@ -1,12 +1,13 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "dockerfile": "backend/Dockerfile",
+    "dockerfile": "Dockerfile",
     "context": "."
   },
   "deploy": {
     "startCommand": "npm start",
-    "restartPolicyMaxRetries": 5
+    "restartPolicyMaxRetries": 5,
+    "restartPolicyDelay": 5
   },
   "env": {
     "NODE_ENV": "production",
