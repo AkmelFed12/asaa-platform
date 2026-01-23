@@ -121,7 +121,7 @@ function App() {
         )}
 
         {currentPage === 'quiz' && (
-          <QuizNew userId={user.id} />
+          <QuizNew user={user} />
         )}
 
         {currentPage === 'events' && (

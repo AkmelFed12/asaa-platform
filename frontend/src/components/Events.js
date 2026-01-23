@@ -3,6 +3,7 @@ import axios from 'axios';
 import '../styles/Events.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const ADMIN_PASSWORD = process.env.REACT_APP_ADMIN_PASSWORD || 'admin123';
 
 const Events = ({ isAdmin }) => {
   const [events, setEvents] = useState([]);
@@ -40,7 +41,7 @@ const Events = ({ isAdmin }) => {
     try {
       await axios.post(`${API_URL}/api/events`, {
         ...formData,
-        adminPassword: process.env.REACT_APP_ADMIN_PASSWORD
+        adminPassword: ADMIN_PASSWORD
       });
       
       setFormData({
@@ -62,7 +63,7 @@ const Events = ({ isAdmin }) => {
     if (window.confirm('Êtes-vous sûr?')) {
       try {
         await axios.delete(`${API_URL}/api/events/${eventId}`, {
-          data: { adminPassword: process.env.REACT_APP_ADMIN_PASSWORD }
+          data: { adminPassword: ADMIN_PASSWORD }
         });
         loadEvents();
       } catch (error) {

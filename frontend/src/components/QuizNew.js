@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import '../styles/Quiz.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Quiz = ({ user }) => {
+  const fallbackUserIdRef = useRef(`guest_${Date.now()}`);
   const [status, setStatus] = useState('loading'); // loading, start, quiz, results
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -14,6 +15,8 @@ const Quiz = ({ user }) => {
   const [userResult, setUserResult] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [selectedOption, setSelectedOption] = useState(null);
+  const resolvedUserId = user?.id || fallbackUserIdRef.current;
+  const resolvedName = user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Participant';
 
   // Charger le quiz du jour
   useEffect(() => {
@@ -47,9 +50,9 @@ const Quiz = ({ user }) => {
   const startQuiz = async () => {
     try {
       await axios.post(`${API_URL}/api/quiz/daily/start`, {
-        userId: user?.id || 'user_' + Date.now(),
+        userId: resolvedUserId,
         email: user?.email,
-        name: user?.name || 'Participant'
+        name: resolvedName
       });
       setStatus('quiz');
       setTimeLeft(10);
@@ -64,7 +67,7 @@ const Quiz = ({ user }) => {
 
     try {
       const response = await axios.post(`${API_URL}/api/quiz/daily/answer`, {
-        userId: user?.id || 'user_' + Date.now(),
+        userId: resolvedUserId,
         questionIndex: currentIndex,
         selectedIndex,
         timeSpent: 10 - timeLeft
@@ -92,7 +95,7 @@ const Quiz = ({ user }) => {
   const completeQuiz = async () => {
     try {
       const response = await axios.post(`${API_URL}/api/quiz/daily/complete`, {
-        userId: user?.id || 'user_' + Date.now()
+        userId: resolvedUserId
       });
 
       setUserResult(response.data);
