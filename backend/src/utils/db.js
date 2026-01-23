@@ -98,6 +98,7 @@ async function initializeSchema() {
         original_name TEXT NOT NULL,
         url TEXT NOT NULL,
         size INTEGER NOT NULL,
+        is_primary BOOLEAN NOT NULL DEFAULT FALSE,
         uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
@@ -105,6 +106,23 @@ async function initializeSchema() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS member_photos_member_id_idx
         ON member_photos (member_id)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS event_photos (
+        id BIGSERIAL PRIMARY KEY,
+        event_id BIGINT NOT NULL,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS event_photos_event_id_idx
+        ON event_photos (event_id)
     `);
 
     await client.query(`

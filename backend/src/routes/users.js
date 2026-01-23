@@ -31,8 +31,6 @@ router.get('/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
-});
-
 router.post('/', requireAdmin, async (req, res) => {
   const { email, password, first_name, last_name, role } = req.body;
   if (!email || !password || !first_name || !last_name) {
@@ -116,6 +114,24 @@ router.delete('/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.get('/export/csv', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, first_name, last_name, role, created_at
+       FROM users
+       ORDER BY created_at DESC`
+    );
+    const header = 'id,email,first_name,last_name,role,created_at\n';
+    const lines = rows.map((row) => (
+      `${row.id},${row.email},${row.first_name},${row.last_name},${row.role},${row.created_at.toISOString()}`
+    ));
+    res.setHeader('Content-Type', 'text/csv');
+    res.send(header + lines.join('\n'));
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }

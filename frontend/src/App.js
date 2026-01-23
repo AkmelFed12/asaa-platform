@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import Auth from './components/Auth';
 import Governance from './components/Governance';
+import MemberProfile from './components/MemberProfile';
 import Quiz from './components/Quiz';
 import QuizNew from './components/QuizNew';
 import Events from './components/Events';
@@ -78,6 +79,12 @@ function App() {
         >
           Gouvernance
         </button>
+        <button
+          className={`nav-btn ${currentPage === 'profile' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('profile')}
+        >
+          👤 Profil
+        </button>
         {user.role === 'admin' && (
           <button 
             className={`nav-btn admin-btn ${currentPage === 'admin' ? 'active' : ''}`}
@@ -121,6 +128,10 @@ function App() {
 
         {currentPage === 'governance' && (
           <Governance isAdmin={user.role === 'admin'} />
+        )}
+
+        {currentPage === 'profile' && (
+          <MemberProfile user={user} />
         )}
 
         {currentPage === 'quiz' && (

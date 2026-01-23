@@ -291,6 +291,41 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const downloadCsv = (filename, blob) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportUsersCsv = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/users/export/csv`, {
+        headers: getAuthHeaders(),
+        responseType: 'blob'
+      });
+      downloadCsv('users.csv', response.data);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const exportMembersCsv = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/members/export/csv`, {
+        headers: getAuthHeaders(),
+        responseType: 'blob'
+      });
+      downloadCsv('members.csv', response.data);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="admin-container">
@@ -384,6 +419,13 @@ const Admin = ({ isAdmin }) => {
               onClick={() => setShowForm(!showForm)}
             >
               {showForm ? '✖️ Annuler' : '➕ Nouvel utilisateur'}
+            </button>
+            <button
+              className="btn-create-user"
+              onClick={exportUsersCsv}
+              type="button"
+            >
+              ⬇️ Export CSV
             </button>
           </div>
 
@@ -571,6 +613,13 @@ const Admin = ({ isAdmin }) => {
       {adminView === 'members' && (
         <div className="admin-section">
           <h3>👥 Gestion des membres</h3>
+          <button
+            className="btn-create-user"
+            onClick={exportMembersCsv}
+            type="button"
+          >
+            ⬇️ Export CSV
+          </button>
           <div className="users-table">
             <table>
               <thead>
@@ -726,8 +775,10 @@ const Admin = ({ isAdmin }) => {
               <thead>
                 <tr>
                   <th>Titre</th>
+                  <th>Description</th>
                   <th>Date</th>
                   <th>Lieu</th>
+                  <th>Image</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -743,6 +794,13 @@ const Admin = ({ isAdmin }) => {
                     </td>
                     <td>
                       <input
+                        type="text"
+                        defaultValue={event.description}
+                        onBlur={(e) => handleUpdateEvent(event.id, { description: e.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
                         type="datetime-local"
                         defaultValue={event.date ? event.date.slice(0, 16) : ''}
                         onBlur={(e) => handleUpdateEvent(event.id, { date: e.target.value })}
@@ -753,6 +811,13 @@ const Admin = ({ isAdmin }) => {
                         type="text"
                         defaultValue={event.location}
                         onBlur={(e) => handleUpdateEvent(event.id, { location: e.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="url"
+                        defaultValue={event.image || ''}
+                        onBlur={(e) => handleUpdateEvent(event.id, { image: e.target.value })}
                       />
                     </td>
                     <td className="actions">

@@ -18,6 +18,45 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/export/csv', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.id, m.member_number, m.date_of_birth, m.city, m.created_at,
+              u.email, u.first_name, u.last_name, u.role
+       FROM members m
+       JOIN users u ON u.id = m.user_id
+       ORDER BY m.created_at DESC`
+    );
+    const header = 'id,member_number,date_of_birth,city,created_at,email,first_name,last_name,role\n';
+    const lines = rows.map((row) => (
+      `${row.id},${row.member_number},${row.date_of_birth || ''},${row.city || ''},${row.created_at.toISOString()},${row.email},${row.first_name},${row.last_name},${row.role}`
+    ));
+    res.setHeader('Content-Type', 'text/csv');
+    res.send(header + lines.join('\n'));
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.get('/user/:userId', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.id, m.member_number, m.date_of_birth, m.city, m.created_at,
+              u.id AS user_id, u.email, u.first_name, u.last_name, u.role
+       FROM members m
+       JOIN users u ON u.id = m.user_id
+       WHERE u.id = $1`,
+      [req.params.userId]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    res.json({ data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
