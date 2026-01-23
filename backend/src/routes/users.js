@@ -31,6 +31,7 @@ router.get('/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
+});
 router.post('/', requireAdmin, async (req, res) => {
   const { email, password, first_name, last_name, role } = req.body;
   if (!email || !password || !first_name || !last_name) {
