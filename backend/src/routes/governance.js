@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireAdmin } = require('../middleware/auth');
 
 // Données en mémoire pour les postes (en production: utiliser la BD)
 let governancePositions = [
@@ -102,7 +103,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Update governance position (admin only)
-router.put('/:id', (req, res) => {
+router.put('/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { holder_name, holder_email, description } = req.body;
   
@@ -125,7 +126,7 @@ router.put('/:id', (req, res) => {
 });
 
 // Create new governance position (admin only)
-router.post('/', (req, res) => {
+router.post('/', requireAdmin, (req, res) => {
   const { position_name, position_type, description, holder_name, holder_email } = req.body;
   
   // En production: vérifier que l'utilisateur est admin
@@ -152,7 +153,7 @@ router.post('/', (req, res) => {
 });
 
 // Delete governance position (admin only)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const positionIndex = governancePositions.findIndex(p => p.id === parseInt(id));
   

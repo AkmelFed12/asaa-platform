@@ -7,6 +7,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "build": "echo 'Backend ready for production'",
+    "generate:quiz": "powershell -ExecutionPolicy Bypass -File scripts/generate-quiz-csv.ps1",
+    "import:quiz": "node scripts/import-quiz-questions.js backend/data/questions_template.csv",
     "test": "jest"
   },
   "keywords": [

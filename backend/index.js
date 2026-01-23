@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const http = require('http');
 const path = require('path');
 require('dotenv').config();
+const { initializeSchema } = require('./src/utils/db');
 
 const app = express();
 
@@ -67,6 +68,10 @@ server.listen(PORT, () => {
   console.log(`🔄 WebSocket: enabled`);
   console.log(`📸 Photo uploads: enabled`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+initializeSchema().catch((error) => {
+  console.error('Database initialization error:', error.message);
 });
 
 module.exports = app;

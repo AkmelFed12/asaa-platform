@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { uploadSingle, uploadMultiple, getImageUrl, deleteImage } = require('../utils/photoUploadService');
+const { pool } = require('../utils/db');
+const { requireAdmin, requireAuth } = require('../middleware/auth');
 
-// In-memory storage pour photos d'événements
+// In-memory storage for event photos
 let eventPhotos = {};
 
 /**
- * Upload une photo pour un événement
+ * Upload a generic photo
  */
 router.post('/upload', uploadSingle, (req, res) => {
   try {
@@ -25,7 +27,7 @@ router.post('/upload', uploadSingle, (req, res) => {
     };
 
     res.json({
-      message: 'Photo uploadée avec succès',
+      message: 'Photo uploadee avec succes',
       photo: photoData
     });
   } catch (error) {
@@ -35,7 +37,7 @@ router.post('/upload', uploadSingle, (req, res) => {
 });
 
 /**
- * Upload plusieurs photos
+ * Upload multiple photos
  */
 router.post('/upload-multiple', uploadMultiple, (req, res) => {
   try {
@@ -53,7 +55,7 @@ router.post('/upload-multiple', uploadMultiple, (req, res) => {
     }));
 
     res.json({
-      message: 'Photos uploadées avec succès',
+      message: 'Photos uploadees avec succes',
       count: photos.length,
       photos: photos
     });
@@ -64,7 +66,7 @@ router.post('/upload-multiple', uploadMultiple, (req, res) => {
 });
 
 /**
- * Associer une photo à un événement
+ * Attach a photo to an event (in-memory)
  */
 router.post('/event/:eventId/photo', uploadSingle, (req, res) => {
   try {
@@ -90,7 +92,7 @@ router.post('/event/:eventId/photo', uploadSingle, (req, res) => {
     eventPhotos[eventId].push(photoData);
 
     res.json({
-      message: 'Photo associée à l\'événement',
+      message: "Photo associee a l'evenement",
       eventId: eventId,
       photo: photoData,
       totalPhotos: eventPhotos[eventId].length
@@ -102,7 +104,43 @@ router.post('/event/:eventId/photo', uploadSingle, (req, res) => {
 });
 
 /**
- * Obtenir les photos d'un événement
+ * Attach a photo to a member (persistent)
+ */
+router.post('/member/:memberId/photo', requireAdmin, uploadSingle, async (req, res) => {
+  try {
+    const { memberId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucun fichier fourni' });
+    }
+
+    const photoData = {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      url: getImageUrl(req.file.filename),
+      size: req.file.size
+    };
+
+    const { rows } = await pool.query(
+      `INSERT INTO member_photos (member_id, filename, original_name, url, size)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, member_id, filename, original_name, url, size, uploaded_at`,
+      [memberId, photoData.filename, photoData.originalName, photoData.url, photoData.size]
+    );
+
+    res.json({
+      message: 'Photo associee au membre',
+      memberId: memberId,
+      photo: rows[0]
+    });
+  } catch (error) {
+    console.error('Erreur:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get event photos
  */
 router.get('/event/:eventId/photos', (req, res) => {
   try {
@@ -120,17 +158,40 @@ router.get('/event/:eventId/photos', (req, res) => {
 });
 
 /**
- * Supprimer une photo
+ * Get member photos
  */
-router.delete('/photo/:photoId', (req, res) => {
+router.get('/member/:memberId/photos', requireAuth, async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { rows } = await pool.query(
+      `SELECT id, member_id, filename, original_name, url, size, uploaded_at
+       FROM member_photos
+       WHERE member_id = $1
+       ORDER BY uploaded_at DESC`,
+      [memberId]
+    );
+
+    res.json({
+      memberId: memberId,
+      photos: rows,
+      count: rows.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Delete a photo (event or member)
+ */
+router.delete('/photo/:photoId', requireAdmin, async (req, res) => {
   try {
     const { photoId } = req.params;
-    
-    // Supprimer de tous les événements
+
     let deleted = false;
     for (const eventId in eventPhotos) {
       eventPhotos[eventId] = eventPhotos[eventId].filter(photo => {
-        if (photo.id === parseInt(photoId)) {
+        if (photo.id === parseInt(photoId, 10)) {
           deleteImage(photo.filename);
           deleted = true;
           return false;
@@ -139,10 +200,20 @@ router.delete('/photo/:photoId', (req, res) => {
       });
     }
 
+    const { rows: memberRows } = await pool.query(
+      'SELECT id, filename FROM member_photos WHERE id = $1',
+      [photoId]
+    );
+    if (memberRows[0]) {
+      await pool.query('DELETE FROM member_photos WHERE id = $1', [photoId]);
+      deleteImage(memberRows[0].filename);
+      deleted = true;
+    }
+
     if (deleted) {
-      res.json({ message: 'Photo supprimée avec succès' });
+      res.json({ message: 'Photo supprimee avec succes' });
     } else {
-      res.status(404).json({ error: 'Photo non trouvée' });
+      res.status(404).json({ error: 'Photo non trouvee' });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -150,28 +221,62 @@ router.delete('/photo/:photoId', (req, res) => {
 });
 
 /**
- * Obtenir les statistiques d'upload
+ * Upload stats
  */
-router.get('/stats', (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     let totalPhotos = 0;
     let totalSize = 0;
 
     for (const eventId in eventPhotos) {
       eventPhotos[eventId].forEach(photo => {
-        totalPhotos++;
+        totalPhotos += 1;
         totalSize += photo.size || 0;
       });
     }
+
+    const { rows: memberStats } = await pool.query(
+      'SELECT COUNT(*)::int AS count, COALESCE(SUM(size), 0)::int AS total_size FROM member_photos'
+    );
+    totalPhotos += memberStats[0].count;
+    totalSize += memberStats[0].total_size;
 
     res.json({
       totalPhotos: totalPhotos,
       totalSize: totalSize,
       totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
-      eventCount: Object.keys(eventPhotos).length
+      eventCount: Object.keys(eventPhotos).length,
+      memberCount: memberStats[0].count
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Search member photos
+ */
+router.get('/search', requireAdmin, async (req, res) => {
+  const query = (req.query.query || '').trim();
+  if (!query) {
+    return res.json({ data: [], total: 0 });
+  }
+
+  try {
+    const like = `%${query.toLowerCase()}%`;
+    const { rows } = await pool.query(
+      `SELECT id, member_id, filename, original_name, url, size, uploaded_at
+       FROM member_photos
+       WHERE LOWER(filename) LIKE $1
+          OR LOWER(original_name) LIKE $1
+          OR CAST(member_id AS TEXT) LIKE $1
+       ORDER BY uploaded_at DESC
+       LIMIT 200`,
+      [like]
+    );
+    res.json({ data: rows, total: rows.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 

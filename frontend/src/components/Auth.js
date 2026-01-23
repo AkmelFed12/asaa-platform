@@ -3,11 +3,8 @@ import { authService } from '../services/api';
 import '../styles/Auth.css';
 
 function Auth({ onLogin }) {
-  const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -17,26 +14,9 @@ function Auth({ onLogin }) {
     setLoading(true);
 
     try {
-      if (isLoginMode) {
-        const response = await authService.login(email, password);
-        if (response.data && response.data.user) {
-          onLogin(response.data.user);
-        }
-      } else {
-        const response = await authService.register({
-          email,
-          password,
-          first_name: firstName,
-          last_name: lastName
-        });
-        if (response.data && response.data.user) {
-          alert('Inscription réussie! Vous pouvez maintenant vous connecter.');
-          setIsLoginMode(true);
-          setEmail('');
-          setPassword('');
-          setFirstName('');
-          setLastName('');
-        }
+      const response = await authService.login(email, password);
+      if (response.data && response.data.user) {
+        onLogin({ user: response.data.user, token: response.data.token });
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Une erreur est survenue');
@@ -50,33 +30,10 @@ function Auth({ onLogin }) {
       <div className="auth-card">
         <h1>ASAA</h1>
         <p className="subtitle">Association des Serviteurs d'Allah Azawajal</p>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleSubmit}>
-          {!isLoginMode && (
-            <>
-              <div className="form-group">
-                <label>Prénom</label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required={!isLoginMode}
-                />
-              </div>
-              <div className="form-group">
-                <label>Nom</label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required={!isLoginMode}
-                />
-              </div>
-            </>
-          )}
-          
           <div className="form-group">
             <label>Email</label>
             <input
@@ -86,7 +43,7 @@ function Auth({ onLogin }) {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Mot de passe</label>
             <input
@@ -96,19 +53,11 @@ function Auth({ onLogin }) {
               required
             />
           </div>
-          
+
           <button type="submit" disabled={loading} className="submit-btn">
-            {loading ? 'Chargement...' : (isLoginMode ? 'Se connecter' : 'S\'inscrire')}
+            {loading ? 'Chargement...' : 'Se connecter'}
           </button>
         </form>
-        
-        <button
-          type="button"
-          onClick={() => setIsLoginMode(!isLoginMode)}
-          className="toggle-btn"
-        >
-          {isLoginMode ? 'Pas de compte? S\'inscrire' : 'Déjà inscrit? Se connecter'}
-        </button>
       </div>
     </div>
   );

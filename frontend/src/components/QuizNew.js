@@ -158,7 +158,7 @@ const Quiz = ({ user }) => {
           </div>
           <div className="info-card">
             <h3>🏆 Classement</h3>
-            <p>Remis à zéro chaque jour</p>
+            <p>Remis à zéro chaque semaine</p>
           </div>
         </div>
 
@@ -261,7 +261,7 @@ const Quiz = ({ user }) => {
           </div>
 
           <div className="leaderboard-section">
-            <h3>🏆 Classement du Jour</h3>
+            <h3>🏆 Classement de la Semaine</h3>
             <div className="leaderboard-table">
               <table>
                 <thead>

@@ -1,562 +1,455 @@
 const express = require('express');
 const router = express.Router();
-const { generateDailyQuestions, calculateLevel } = require('../utils/quizEngine');
+const { pool } = require('../utils/db');
+const { calculateLevel } = require('../utils/quizEngine');
 const { sendQuizNotification } = require('../utils/emailService');
 const websocketManager = require('../utils/websocketManager');
+const { requireAdmin } = require('../middleware/auth');
 
-// In-memory storage for daily quiz
-let dailyQuiz = {
-  date: new Date().toISOString().split('T')[0],
-  questions: [],
-  attempts: {},
-  leaderboard: []
-};
+const DAILY_QUESTION_COUNT = 20;
+const TIME_PER_QUESTION = 10;
 
-// Initialize daily quiz on startup
-function initializeDailyQuiz() {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  
-  if (dailyQuiz.date !== today) {
-    dailyQuiz = {
-      date: today,
-      questions: generateDailyQuestions(),
-      attempts: {},
-      leaderboard: []
-    };
-    console.log(`[${today} 20:00] New daily quiz generated with 20 questions`);
+const getToday = () => new Date().toISOString().split('T')[0];
+
+async function getOrCreateDailyQuiz() {
+  const quizDate = getToday();
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const insertQuiz = await client.query(
+      `INSERT INTO daily_quizzes (quiz_date)
+       VALUES ($1)
+       ON CONFLICT (quiz_date) DO NOTHING
+       RETURNING id`,
+      [quizDate]
+    );
+
+    let quizId = insertQuiz.rows[0]?.id;
+    if (!quizId) {
+      const existing = await client.query(
+        'SELECT id FROM daily_quizzes WHERE quiz_date = $1',
+        [quizDate]
+      );
+      quizId = existing.rows[0]?.id;
+    }
+
+    const { rows: existingQuestions } = await client.query(
+      'SELECT COUNT(*)::int AS count FROM daily_quiz_questions WHERE quiz_id = $1',
+      [quizId]
+    );
+
+    if (existingQuestions[0].count === 0) {
+      const { rows: questions } = await client.query(
+        `SELECT id, question_text, options, correct_index, difficulty
+         FROM quiz_questions
+         WHERE is_active = TRUE
+           AND id NOT IN (SELECT question_id FROM quiz_question_usage)
+         ORDER BY RANDOM()
+         LIMIT $1`,
+        [DAILY_QUESTION_COUNT]
+      );
+
+      if (questions.length < DAILY_QUESTION_COUNT) {
+        throw new Error('Not enough unused questions to generate daily quiz');
+      }
+
+      for (let i = 0; i < questions.length; i += 1) {
+        await client.query(
+          `INSERT INTO daily_quiz_questions (quiz_id, question_id, position)
+           VALUES ($1, $2, $3)`,
+          [quizId, questions[i].id, i]
+        );
+        await client.query(
+          `INSERT INTO quiz_question_usage (question_id, quiz_date)
+           VALUES ($1, $2)
+           ON CONFLICT (question_id) DO NOTHING`,
+          [questions[i].id, quizDate]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return { quizId, quizDate };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
-// Schedule quiz reset at 20:00 every day
-function scheduleQuizReset() {
-  const now = new Date();
-  let nextReset = new Date(now);
-  nextReset.setHours(20, 0, 0, 0);
-  
-  if (nextReset <= now) {
-    nextReset.setDate(nextReset.getDate() + 1);
-  }
-  
-  const timeUntilReset = nextReset - now;
-  
-  setTimeout(() => {
-    initializeDailyQuiz();
-    scheduleQuizReset();
-  }, timeUntilReset);
-  
-  console.log(`Quiz reset scheduled for ${nextReset.toISOString()}`);
+async function getDailyQuestions(quizId) {
+  const { rows } = await pool.query(
+    `SELECT dq.position, q.id, q.question_text, q.options, q.difficulty
+     FROM daily_quiz_questions dq
+     JOIN quiz_questions q ON q.id = dq.question_id
+     WHERE dq.quiz_id = $1
+     ORDER BY dq.position`,
+    [quizId]
+  );
+
+  return rows.map((row) => ({
+    index: row.position,
+    question: row.question_text,
+    options: row.options,
+    difficulty: row.difficulty
+  }));
 }
 
-// Initialize on startup
-initializeDailyQuiz();
-scheduleQuizReset();
+async function getWeeklyLeaderboard(limit = 100) {
+  const { rows } = await pool.query(
+    `WITH weekly AS (
+       SELECT DISTINCT ON (user_id)
+         user_id,
+         COALESCE(user_name, 'Participant') AS user_name,
+         score,
+         percentage,
+         level,
+         time_spent_seconds
+       FROM daily_quiz_attempts
+       WHERE completed_at >= date_trunc('week', NOW())
+         AND completed_at < date_trunc('week', NOW()) + INTERVAL '1 week'
+       ORDER BY user_id, score DESC, time_spent_seconds ASC
+     ),
+     ranked AS (
+       SELECT
+         ROW_NUMBER() OVER (ORDER BY score DESC, time_spent_seconds ASC) AS rank,
+         user_id,
+         user_name,
+         score,
+         percentage,
+         level
+       FROM weekly
+     )
+     SELECT * FROM ranked ORDER BY rank LIMIT $1`,
+    [limit]
+  );
 
-// Legacy questions for backward compatibility
-const quizQuestions = [
-  {
-    id: 1,
-    question_text: 'Combien de piliers y a-t-il dans l\'Islam?',
-    options: { a: '4', b: '5', c: '6', d: '7' },
-    correct_answer: 'b',
-    explanation: 'Les 5 piliers de l\'Islam sont: la Chahada, la Salat, la Zakat, le Sawm et le Hajj.'
-  },
-  {
-    id: 2,
-    question_text: 'Quel est le premier pilier de l\'Islam?',
-    options: { a: 'La prière', b: 'L\'attestation de foi (Chahada)', c: 'L\'aumône', d: 'Le jeûne' },
-    correct_answer: 'b',
-    explanation: 'La Chahada est la première condition pour devenir musulman.'
-  },
-  {
-    id: 3,
-    question_text: 'En quel année le Coran a-t-il été révélé?',
-    options: { a: '620 CE', b: '630 CE', c: '610 CE', d: '640 CE' },
-    correct_answer: 'c',
-    explanation: 'La première révélation du Coran au Prophète Muhammad s\'est déroulée en 610 CE.'
-  },
-  {
-    id: 4,
-    question_text: 'Quel prophète a construit la Kaaba?',
-    options: { a: 'Abraham et Ismaël', b: 'Moïse et Aaron', c: 'Noé', d: 'David' },
-    correct_answer: 'a',
-    explanation: 'Selon le Coran, Ibrahim et Ismaïl ont construit la Kaaba.'
-  },
-  {
-    id: 5,
-    question_text: 'Combien de fois par jour un musulman doit-il prier?',
-    options: { a: '3 fois', b: '4 fois', c: '5 fois', d: '6 fois' },
-    correct_answer: 'c',
-    explanation: 'Les 5 prières obligatoires sont: Fajr, Dhuhr, Asr, Maghrib et Isha.'
-  },
-  {
-    id: 6,
-    question_text: 'En quel mois doit-on jeûner?',
-    options: { a: 'Muharram', b: 'Rajab', c: 'Ramadan', d: 'Dhul-Hijjah' },
-    correct_answer: 'c',
-    explanation: 'Le jeûne du Ramadan est le 4ème pilier de l\'Islam.'
-  },
-  {
-    id: 7,
-    question_text: 'Quel est le dernier prophète envoyé par Allah?',
-    options: { a: 'Moïse', b: 'Jésus', c: 'Muhammad', d: 'Abraham' },
-    correct_answer: 'c',
-    explanation: 'Le Prophète Muhammad est le dernier prophète selon l\'Islam.'
-  },
-  {
-    id: 8,
-    question_text: 'Combien de sourates le Coran contient-il?',
-    options: { a: '104', b: '114', c: '124', d: '134' },
-    correct_answer: 'b',
-    explanation: 'Le Coran contient exactement 114 sourates.'
-  },
-  {
-    id: 9,
-    question_text: 'Quel est le plus grand mois du calendrier islamique?',
-    options: { a: 'Ramadan', b: 'Muharram', c: 'Dhul-Hijjah', d: 'Rajab' },
-    correct_answer: 'a',
-    explanation: 'Le Ramadan est le 9ème mois du calendrier lunaire islamique.'
-  },
-  {
-    id: 10,
-    question_text: 'Qui était le premier calife après le Prophète Muhammad?',
-    options: { a: 'Omar ibn al-Khattab', b: 'Othman ibn Affan', c: 'Ali ibn Abi Talib', d: 'Abou Bakr as-Siddiq' },
-    correct_answer: 'd',
-    explanation: 'Abou Bakr as-Siddiq a été le premier calife bien-guidé.'
-  },
-  {
-    id: 11,
-    question_text: 'La Zakat est obligatoire sur quel type de richesse?',
-    options: { a: 'Seulement l\'or', b: 'Seulement l\'argent', c: 'Toute forme de richesse qui atteint le Nisab', d: 'Seulement les terres' },
-    correct_answer: 'c',
-    explanation: 'La Zakat s\'applique à toute richesse accumulée dépassant le Nisab.'
-  },
-  {
-    id: 12,
-    question_text: 'Combien d\'années le Prophète Muhammad a-t-il prêché?',
-    options: { a: '13 ans', b: '23 ans', c: '33 ans', d: '43 ans' },
-    correct_answer: 'b',
-    explanation: 'Le Prophète a prêché l\'Islam pendant 23 ans.'
-  },
-  {
-    id: 13,
-    question_text: 'Quel est le nom de la migration du Prophète de La Mecque à Médine?',
-    options: { a: 'Hijrah', b: 'Hadj', c: 'Haram', d: 'Haraka' },
-    correct_answer: 'a',
-    explanation: 'La Hijrah marque le début du calendrier islamique.'
-  },
-  {
-    id: 14,
-    question_text: 'Combien de versets le Coran contient-il?',
-    options: { a: '6000', b: '6236', c: '8000', d: '10000' },
-    correct_answer: 'b',
-    explanation: 'Le Coran contient 6236 versets selon la majorité des savants.'
-  },
-  {
-    id: 15,
-    question_text: 'Quel était le métier du Prophète Muhammad avant sa mission prophétique?',
-    options: { a: 'Agriculteur', b: 'Marchand', c: 'Berger', d: 'Soldat' },
-    correct_answer: 'b',
-    explanation: 'Le Prophète était marchand, travaillant pour Khadija.'
-  },
-  {
-    id: 16,
-    question_text: 'En quel lieu a eu lieu la bataille de Badr?',
-    options: { a: 'Uhud', b: 'Khandaq', c: 'Badr', d: 'Muta' },
-    correct_answer: 'c',
-    explanation: 'La bataille de Badr a eu lieu en 625 CE en Arabie Saoudite.'
-  },
-  {
-    id: 17,
-    question_text: 'Combien de fils avait le Prophète Muhammad?',
-    options: { a: '2', b: '3', c: '4', d: '5' },
-    correct_answer: 'b',
-    explanation: 'Le Prophète avait 3 fils: Al-Qasim, Abdullah et Ibrahim.'
-  },
-  {
-    id: 18,
-    question_text: 'Quel est le titre donné à celui qui a mémorisé le Coran entièrement?',
-    options: { a: 'Qari\'', b: 'Hafiz', c: 'Mufti', d: 'Imam' },
-    correct_answer: 'b',
-    explanation: 'Un Hafiz est celui qui a mémorisé les 114 sourates du Coran.'
-  },
-  {
-    id: 19,
-    question_text: 'La première mosquée construite en Islam a été construite dans quel lieu?',
-    options: { a: 'La Mecque', b: 'Jérusalem', c: 'Médine', d: 'Damas' },
-    correct_answer: 'c',
-    explanation: 'La mosquée de Quba a été la première mosquée construite à Médine.'
-  },
-  {
-    id: 20,
-    question_text: 'Quel est le mois où a eu lieu la révélation du Coran?',
-    options: { a: 'Muharram', b: 'Ramadan', c: 'Dhul-Hijjah', d: 'Safar' },
-    correct_answer: 'b',
-    explanation: 'Le Coran a été révélé durant le Ramadan de l\'année 610 CE.'
+  return rows;
+}
+
+async function getWeeklyRank(userId) {
+  const { rows } = await pool.query(
+    `WITH weekly AS (
+       SELECT DISTINCT ON (user_id)
+         user_id,
+         score,
+         time_spent_seconds
+       FROM daily_quiz_attempts
+       WHERE completed_at >= date_trunc('week', NOW())
+         AND completed_at < date_trunc('week', NOW()) + INTERVAL '1 week'
+       ORDER BY user_id, score DESC, time_spent_seconds ASC
+     ),
+     ranked AS (
+       SELECT
+         ROW_NUMBER() OVER (ORDER BY score DESC, time_spent_seconds ASC) AS rank,
+         user_id
+       FROM weekly
+     )
+     SELECT rank FROM ranked WHERE user_id = $1`,
+    [userId]
+  );
+
+  return rows[0]?.rank || null;
+}
+
+router.get('/daily/quiz', async (req, res, next) => {
+  try {
+    const { quizId, quizDate } = await getOrCreateDailyQuiz();
+    const questions = await getDailyQuestions(quizId);
+
+    res.json({
+      success: true,
+      date: quizDate,
+      totalQuestions: DAILY_QUESTION_COUNT,
+      timePerQuestion: TIME_PER_QUESTION,
+      questions
+    });
+  } catch (error) {
+    next(error);
   }
-];
-
-// Quiz attempts storage (en production: utiliser la BD)
-let quizAttempts = [];
-
-// Get all quiz questions (sans les réponses correctes)
-router.get('/questions', (req, res) => {
-  const questions = quizQuestions.map(q => ({
-    id: q.id,
-    question_text: q.question_text,
-    options: q.options
-  }));
-  
-  res.json({
-    message: 'Quiz questions retrieved',
-    data: questions,
-    total: questions.length
-  });
 });
 
-// Start a quiz attempt
-router.post('/start', (req, res) => {
-  const { user_id, user_name } = req.body;
-  
-  if (!user_id || !user_name) {
-    return res.status(400).json({ error: 'User ID and name required' });
-  }
-  
-  const attempt = {
-    id: Math.random().toString(36).substr(2, 9),
-    user_id,
-    user_name,
-    start_time: Date.now(),
-    answers: {},
-    status: 'in_progress'
-  };
-  
-  quizAttempts.push(attempt);
-  
-  res.status(201).json({
-    message: 'Quiz attempt started',
-    data: { attempt_id: attempt.id }
-  });
-});
-
-// Submit quiz answers
-router.post('/submit', (req, res) => {
-  const { attempt_id, answers } = req.body;
-  
-  if (!attempt_id || !answers) {
-    return res.status(400).json({ error: 'Attempt ID and answers required' });
-  }
-  
-  const attempt = quizAttempts.find(a => a.id === attempt_id);
-  
-  if (!attempt) {
-    return res.status(404).json({ error: 'Attempt not found' });
-  }
-  
-  // Calculer le score
-  let score = 0;
-  const answerDetails = [];
-  
-  Object.entries(answers).forEach(([questionId, userAnswer]) => {
-    const question = quizQuestions.find(q => q.id === parseInt(questionId));
-    
-    if (question) {
-      const isCorrect = userAnswer === question.correct_answer;
-      if (isCorrect) score++;
-      
-      answerDetails.push({
-        question_id: questionId,
-        user_answer: userAnswer,
-        correct_answer: question.correct_answer,
-        is_correct: isCorrect,
-        explanation: question.explanation
-      });
-    }
-  });
-  
-  attempt.end_time = Date.now();
-  attempt.time_spent = Math.round((attempt.end_time - attempt.start_time) / 1000);
-  attempt.score = score;
-  attempt.total_questions = 20;
-  attempt.status = 'completed';
-  attempt.answers = answerDetails;
-  
-  res.json({
-    message: 'Quiz submitted successfully',
-    data: {
-      attempt_id: attempt.id,
-      score: score,
-      total_questions: 20,
-      percentage: Math.round((score / 20) * 100),
-      time_spent_seconds: attempt.time_spent,
-      answers: answerDetails
-    }
-  });
-});
-
-// Get leaderboard (classement)
-router.get('/leaderboard', (req, res) => {
-  const leaderboard = quizAttempts
-    .filter(a => a.status === 'completed')
-    .map(a => ({
-      rank: 0,
-      user_name: a.user_name,
-      score: a.score,
-      total_questions: a.total_questions,
-      percentage: Math.round((a.score / a.total_questions) * 100),
-      time_spent_seconds: a.time_spent,
-      attempt_date: new Date(a.end_time).toLocaleString('fr-FR')
-    }))
-    .sort((a, b) => {
-      if (b.percentage !== a.percentage) return b.percentage - a.percentage;
-      return a.time_spent_seconds - b.time_spent_seconds;
-    })
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
-  
-  res.json({
-    message: 'Quiz leaderboard',
-    data: leaderboard,
-    total: leaderboard.length
-  });
-});
-
-// Get user quiz history
-router.get('/history/:user_id', (req, res) => {
-  const { user_id } = req.params;
-  
-  const userAttempts = quizAttempts
-    .filter(a => a.user_id === user_id && a.status === 'completed')
-    .map(a => ({
-      attempt_id: a.id,
-      score: a.score,
-      total_questions: a.total_questions,
-      percentage: Math.round((a.score / a.total_questions) * 100),
-      time_spent_seconds: a.time_spent,
-      attempt_date: new Date(a.end_time).toLocaleString('fr-FR')
-    }))
-    .sort((a, b) => new Date(b.attempt_date) - new Date(a.attempt_date));
-  
-  res.json({
-    message: 'User quiz history',
-    data: userAttempts,
-    total: userAttempts.length
-  });
-});
-
-// === NEW DAILY QUIZ ENDPOINTS ===
-
-// GET: Today's quiz (10 seconds per question)
-router.get('/daily/quiz', (req, res) => {
-  if (dailyQuiz.questions.length === 0) {
-    initializeDailyQuiz();
-  }
-  
-  const questionsWithoutAnswers = dailyQuiz.questions.map((q, idx) => ({
-    index: idx,
-    question: q.question,
-    options: q.options,
-    difficulty: q.difficulty
-  }));
-  
-  res.json({
-    success: true,
-    date: dailyQuiz.date,
-    totalQuestions: 20,
-    timePerQuestion: 10,
-    questions: questionsWithoutAnswers
-  });
-});
-
-// POST: Start daily quiz attempt
-router.post('/daily/start', (req, res) => {
+router.post('/daily/start', async (req, res, next) => {
   const { userId, email, name } = req.body;
-  
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
   }
-  
-  const attemptId = `attempt_${userId}_${Date.now()}`;
-  
-  dailyQuiz.attempts[userId] = {
-    attemptId,
-    userId,
-    email,
-    name,
-    startTime: new Date(),
-    answers: [],
-    score: 0,
-    completed: false
-  };
-  
-  res.json({
-    success: true,
-    attemptId,
-    message: 'Quiz started - 10 seconds per question'
-  });
-});
 
-// POST: Submit answer to daily quiz
-router.post('/daily/answer', (req, res) => {
-  const { userId, questionIndex, selectedIndex, timeSpent } = req.body;
-  
-  if (!dailyQuiz.attempts[userId]) {
-    return res.status(400).json({ error: 'Quiz not started' });
-  }
-  
-  if (questionIndex < 0 || questionIndex >= dailyQuiz.questions.length) {
-    return res.status(400).json({ error: 'Invalid question' });
-  }
-  
-  const attempt = dailyQuiz.attempts[userId];
-  const question = dailyQuiz.questions[questionIndex];
-  const isCorrect = selectedIndex === question.correct;
-  
-  attempt.answers.push({
-    questionIndex,
-    selectedIndex,
-    isCorrect,
-    timeSpent,
-    questionText: question.question
-  });
-  
-  if (isCorrect) {
-    attempt.score++;
-  }
-  
-  res.json({
-    success: true,
-    isCorrect,
-    correctIndex: question.correct,
-    currentScore: attempt.score,
-    totalQuestions: dailyQuiz.questions.length
-  });
-});
+  try {
+    const { quizId } = await getOrCreateDailyQuiz();
+    const existing = await pool.query(
+      `SELECT id FROM daily_quiz_attempts
+       WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NULL`,
+      [quizId, userId]
+    );
 
-// POST: Complete daily quiz
-router.post('/daily/complete', (req, res) => {
-  const { userId } = req.body;
-  
-  if (!dailyQuiz.attempts[userId]) {
-    return res.status(400).json({ error: 'Quiz not started' });
-  }
-  
-  const attempt = dailyQuiz.attempts[userId];
-  attempt.completed = true;
-  attempt.completionTime = new Date();
-  attempt.percentage = Math.round((attempt.score / dailyQuiz.questions.length) * 100);
-  attempt.level = calculateLevel(attempt.score);
-  
-  // Add to leaderboard
-  const existingIndex = dailyQuiz.leaderboard.findIndex(l => l.userId === userId);
-  
-  const leaderboardEntry = {
-    userId,
-    name: attempt.name,
-    email: attempt.email,
-    score: attempt.score,
-    percentage: attempt.percentage,
-    level: attempt.level,
-    completionTime: attempt.completionTime
-  };
-  
-  if (existingIndex !== -1) {
-    dailyQuiz.leaderboard[existingIndex] = leaderboardEntry;
-  } else {
-    dailyQuiz.leaderboard.push(leaderboardEntry);
-  }
-  
-  // Sort leaderboard
-  dailyQuiz.leaderboard.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.completionTime - b.completionTime;
-  });
-  
-  const rank = dailyQuiz.leaderboard.findIndex(l => l.userId === userId) + 1;
-  
-  // Send completion email
-  try {
-    sendQuizNotification(attempt.email, attempt.name, {
-      score: attempt.score,
-      total: dailyQuiz.questions.length,
-      percentage: attempt.percentage,
-      level: attempt.level,
-      rank
-    })
-      .then(() => console.log(`✉️  Quiz result email sent to ${attempt.email}`))
-      .catch(err => console.error('Email error:', err.message));
-  } catch (error) {
-    console.error('Email service error:', error.message);
-  }
-  
-  // Broadcast leaderboard update via WebSocket
-  try {
-    websocketManager.broadcastToRoom('leaderboard-daily', 'LEADERBOARD_UPDATE', {
-      rank,
-      name: attempt.name,
-      score: attempt.score,
-      percentage: attempt.percentage,
-      level: attempt.level
+    if (existing.rows[0]) {
+      return res.json({
+        success: true,
+        attemptId: existing.rows[0].id,
+        message: 'Quiz already started'
+      });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO daily_quiz_attempts (quiz_id, user_id, user_name, email)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [quizId, userId, name, email]
+    );
+
+    res.json({
+      success: true,
+      attemptId: rows[0].id,
+      message: 'Quiz started'
     });
   } catch (error) {
-    console.error('WebSocket broadcast error:', error.message);
+    next(error);
   }
-  
-  res.json({
-    success: true,
-    message: 'Quiz completed successfully',
-    score: attempt.score,
-    totalQuestions: dailyQuiz.questions.length,
-    percentage: attempt.percentage,
-    level: attempt.level,
-    rank,
-    totalParticipants: dailyQuiz.leaderboard.length
-  });
 });
 
-// GET: Daily leaderboard
-router.get('/daily/leaderboard', (req, res) => {
-  const leaderboard = dailyQuiz.leaderboard
-    .slice(0, 100)
-    .map((entry, index) => ({
-      rank: index + 1,
-      name: entry.name,
-      score: entry.score,
-      percentage: entry.percentage,
-      level: entry.level
-    }));
-  
-  res.json({
-    success: true,
-    date: dailyQuiz.date,
-    leaderboard,
-    totalParticipants: dailyQuiz.leaderboard.length,
-    quizStartTime: '20:00',
-    nextQuizTime: '20:00 tomorrow'
-  });
+router.post('/daily/answer', async (req, res, next) => {
+  const { userId, questionIndex, selectedIndex, timeSpent } = req.body;
+
+  if (userId === undefined || questionIndex === undefined) {
+    return res.status(400).json({ error: 'User ID and question index required' });
+  }
+
+  try {
+    const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: attempts } = await pool.query(
+      `SELECT id FROM daily_quiz_attempts
+       WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NULL`,
+      [quizId, userId]
+    );
+
+    const attemptId = attempts[0]?.id;
+    if (!attemptId) {
+      return res.status(400).json({ error: 'Quiz not started' });
+    }
+
+    const { rows: questionRows } = await pool.query(
+      `SELECT q.id, q.correct_index
+       FROM daily_quiz_questions dq
+       JOIN quiz_questions q ON q.id = dq.question_id
+       WHERE dq.quiz_id = $1 AND dq.position = $2`,
+      [quizId, questionIndex]
+    );
+
+    const question = questionRows[0];
+    if (!question) {
+      return res.status(400).json({ error: 'Invalid question' });
+    }
+
+    const { rows: existingAnswer } = await pool.query(
+      `SELECT id FROM daily_quiz_answers
+       WHERE attempt_id = $1 AND question_id = $2`,
+      [attemptId, question.id]
+    );
+
+    if (existingAnswer[0]) {
+      return res.status(409).json({ error: 'Question already answered' });
+    }
+
+    const isCorrect = selectedIndex === question.correct_index;
+    await pool.query(
+      `INSERT INTO daily_quiz_answers
+       (attempt_id, question_id, selected_index, is_correct, time_spent_seconds)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [attemptId, question.id, selectedIndex, isCorrect, timeSpent || 0]
+    );
+
+    const { rows: scoreRows } = await pool.query(
+      `SELECT COUNT(*)::int AS score
+       FROM daily_quiz_answers
+       WHERE attempt_id = $1 AND is_correct = TRUE`,
+      [attemptId]
+    );
+
+    const currentScore = scoreRows[0].score;
+    await pool.query(
+      'UPDATE daily_quiz_attempts SET score = $1 WHERE id = $2',
+      [currentScore, attemptId]
+    );
+
+    res.json({
+      success: true,
+      isCorrect,
+      correctIndex: question.correct_index,
+      currentScore,
+      totalQuestions: DAILY_QUESTION_COUNT
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-// GET: User's daily result
-router.get('/daily/result/:userId', (req, res) => {
+router.post('/daily/complete', async (req, res, next) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+
+  try {
+    const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: attempts } = await pool.query(
+      `SELECT id, started_at, user_name, email
+       FROM daily_quiz_attempts
+       WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NULL`,
+      [quizId, userId]
+    );
+
+    const attempt = attempts[0];
+    if (!attempt) {
+      return res.status(400).json({ error: 'Quiz not started' });
+    }
+
+    const { rows: scoreRows } = await pool.query(
+      `SELECT COUNT(*)::int AS score
+       FROM daily_quiz_answers
+       WHERE attempt_id = $1 AND is_correct = TRUE`,
+      [attempt.id]
+    );
+
+    const score = scoreRows[0].score;
+    const percentage = Math.round((score / DAILY_QUESTION_COUNT) * 100);
+    const level = calculateLevel(score);
+    const timeSpent = Math.max(
+      0,
+      Math.round((Date.now() - new Date(attempt.started_at).getTime()) / 1000)
+    );
+
+    await pool.query(
+      `UPDATE daily_quiz_attempts
+       SET completed_at = NOW(),
+           score = $1,
+           percentage = $2,
+           level = $3,
+           time_spent_seconds = $4
+       WHERE id = $5`,
+      [score, percentage, level, timeSpent, attempt.id]
+    );
+
+    const rank = await getWeeklyRank(userId);
+
+    try {
+      if (attempt.email && attempt.user_name) {
+        sendQuizNotification(attempt.email, attempt.user_name, {
+          score,
+          total: DAILY_QUESTION_COUNT,
+          percentage,
+          level,
+          rank
+        })
+          .then(() => console.log(`Quiz result email sent to ${attempt.email}`))
+          .catch(err => console.error('Email error:', err.message));
+      }
+    } catch (error) {
+      console.error('Email service error:', error.message);
+    }
+
+    try {
+      websocketManager.broadcastToRoom('leaderboard-weekly', 'LEADERBOARD_UPDATE', {
+        rank,
+        name: attempt.user_name,
+        score,
+        percentage,
+        level
+      });
+    } catch (error) {
+      console.error('WebSocket broadcast error:', error.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Quiz completed successfully',
+      score,
+      totalQuestions: DAILY_QUESTION_COUNT,
+      percentage,
+      level,
+      rank
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/daily/leaderboard', async (req, res, next) => {
+  try {
+    const leaderboard = await getWeeklyLeaderboard(100);
+    const { rows: totalRows } = await pool.query(
+      `SELECT COUNT(DISTINCT user_id)::int AS total
+       FROM daily_quiz_attempts
+       WHERE completed_at >= date_trunc('week', NOW())
+         AND completed_at < date_trunc('week', NOW()) + INTERVAL '1 week'`
+    );
+
+    res.json({
+      success: true,
+      scope: 'week',
+      leaderboard: leaderboard.map(entry => ({
+        rank: entry.rank,
+        name: entry.user_name,
+        score: entry.score,
+        percentage: entry.percentage,
+        level: entry.level
+      })),
+      totalParticipants: totalRows[0].total
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/daily/history/:userId', async (req, res, next) => {
   const { userId } = req.params;
-  const attempt = dailyQuiz.attempts[userId];
-  
-  if (!attempt || !attempt.completed) {
-    return res.status(404).json({ error: 'Quiz not completed' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT quiz_id, score, percentage, level, time_spent_seconds, completed_at
+       FROM daily_quiz_attempts
+       WHERE user_id = $1 AND completed_at IS NOT NULL
+       ORDER BY completed_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      history: rows
+    });
+  } catch (error) {
+    next(error);
   }
-  
-  const rank = dailyQuiz.leaderboard.findIndex(l => l.userId === userId) + 1;
-  
-  res.json({
-    success: true,
-    score: attempt.score,
-    totalQuestions: dailyQuiz.questions.length,
-    percentage: attempt.percentage,
-    level: attempt.level,
-    rank,
-    date: dailyQuiz.date,
-    answers: attempt.answers
-  });
+});
+
+router.post('/questions', requireAdmin, async (req, res, next) => {
+  const { question, options, correctIndex, difficulty } = req.body;
+  if (!question || !options || correctIndex === undefined || !difficulty) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (!Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ error: 'Options must be an array' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO quiz_questions (question_text, options, correct_index, difficulty, created_by)
+       VALUES ($1, $2::jsonb, $3, $4, $5)
+       RETURNING id, question_text, options, correct_index, difficulty`,
+      [question, JSON.stringify(options), correctIndex, difficulty, 'admin']
+    );
+
+    res.status(201).json({
+      success: true,
+      question: rows[0]
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
-

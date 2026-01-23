@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import '../styles/PhotoUpload.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 /**
  * Photo Upload Component
  * Supports single and batch uploads with preview
  */
-const PhotoUpload = ({ eventId = null, onUploadSuccess = null }) => {
+const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }) => {
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -85,11 +87,16 @@ const PhotoUpload = ({ eventId = null, onUploadSuccess = null }) => {
         formData.append('photo', files[0]);
 
         const endpoint = eventId
-          ? `/api/photos/event/${eventId}/photo`
-          : '/api/photos/upload';
+          ? `${API_URL}/api/photos/event/${eventId}/photo`
+          : memberId
+            ? `${API_URL}/api/photos/member/${memberId}/photo`
+            : `${API_URL}/api/photos/upload`;
 
         const response = await fetch(endpoint, {
           method: 'POST',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+          },
           body: formData
         });
 
@@ -111,8 +118,11 @@ const PhotoUpload = ({ eventId = null, onUploadSuccess = null }) => {
           formData.append('photos', file);
         });
 
-        const response = await fetch('/api/photos/upload-multiple', {
+        const response = await fetch(`${API_URL}/api/photos/upload-multiple`, {
           method: 'POST',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+          },
           body: formData
         });
 

@@ -1,126 +1,180 @@
 const express = require('express');
 const router = express.Router();
+const { pool } = require('../utils/db');
 const { sendEventNotification } = require('../utils/emailService');
 const websocketManager = require('../utils/websocketManager');
+const { requireAdmin } = require('../middleware/auth');
 
-// In-memory storage
-let events = [];
-let eventIdCounter = 1;
-
-const ADMIN_PASSWORD = 'admin123';
-
-// Middleware to verify admin
-const verifyAdmin = (req, res, next) => {
-  const { adminPassword } = req.body || req.query;
-  if (adminPassword !== ADMIN_PASSWORD) {
-    return res.status(403).json({ error: 'Admin access denied' });
-  }
-  next();
-};
-
-// Créer un événement (admin only)
-router.post('/', verifyAdmin, (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { title, description, date, location, image } = req.body;
 
   if (!title || !description || !date || !location) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const newEvent = {
-    id: eventIdCounter++,
-    title,
-    description,
-    date: new Date(date),
-    location,
-    image: image || '',
-    createdAt: new Date()
-  };
-
-  events.push(newEvent);
-  
-  // Broadcast event creation via WebSocket
   try {
-    websocketManager.broadcastToAll('EVENT_CREATED', {
-      id: newEvent.id,
-      title: newEvent.title,
-      date: newEvent.date,
-      location: newEvent.location
-    });
+    const { rows } = await pool.query(
+      `INSERT INTO events (title, description, date, location, image)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, title, description, date, location, image, created_at`,
+      [title, description, date, location, image || null]
+    );
+
+    const newEvent = rows[0];
+
+    try {
+      websocketManager.broadcastToAll('EVENT_CREATED', {
+        id: newEvent.id,
+        title: newEvent.title,
+        date: newEvent.date,
+        location: newEvent.location
+      });
+    } catch (error) {
+      console.error('WebSocket broadcast error:', error.message);
+    }
+
+    try {
+      sendEventNotification('notifications@asaa.com', 'ASAA Members', {
+        title: newEvent.title,
+        description: newEvent.description,
+        date: new Date(newEvent.date).toLocaleString('fr-FR'),
+        location: newEvent.location,
+        image: newEvent.image
+      })
+        .then(() => console.log(`Event notification sent for: ${newEvent.title}`))
+        .catch(err => console.error('Email error:', err.message));
+    } catch (error) {
+      console.error('Email service error:', error.message);
+    }
+
+    res.json(newEvent);
   } catch (error) {
-    console.error('WebSocket broadcast error:', error.message);
+    console.error('Event create error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  
-  // Send event notification emails (in production, would send to all subscribed users)
+});
+
+router.get('/', async (req, res) => {
   try {
-    sendEventNotification('notifications@asaa.com', 'ASAA Members', {
-      title: newEvent.title,
-      description: newEvent.description,
-      date: newEvent.date.toLocaleString('fr-FR'),
-      location: newEvent.location,
-      image: newEvent.image
-    })
-      .then(() => console.log(`✉️  Event notification sent for: ${newEvent.title}`))
-      .catch(err => console.error('Email error:', err.message));
+    const { rows } = await pool.query(
+      `SELECT id, title, description, date, location, image, created_at
+       FROM events
+       WHERE date >= NOW()
+       ORDER BY date ASC`
+    );
+    res.json(rows);
   } catch (error) {
-    console.error('Email service error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  
-  res.json(newEvent);
 });
 
-// Obtenir tous les événements à venir
-router.get('/', (req, res) => {
-  const now = new Date();
-  const future = events
-    .filter(e => new Date(e.date) >= now)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-  res.json(future);
-});
-
-// Obtenir tous les événements passés
-router.get('/past', (req, res) => {
-  const now = new Date();
-  const past = events
-    .filter(e => new Date(e.date) < now)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-  res.json(past);
-});
-
-// Obtenir un événement par ID
-router.get('/:id', (req, res) => {
-  const event = events.find(e => e.id === parseInt(req.params.id));
-  if (!event) {
-    return res.status(404).json({ error: 'Event not found' });
+router.get('/past', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, date, location, image, created_at
+       FROM events
+       WHERE date < NOW()
+       ORDER BY date DESC`
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  res.json(event);
 });
 
-// Mettre à jour un événement (admin only)
-router.put('/:id', verifyAdmin, (req, res) => {
-  const event = events.find(e => e.id === parseInt(req.params.id));
-  if (!event) {
-    return res.status(404).json({ error: 'Event not found' });
+router.get('/all', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, date, location, image, created_at
+       FROM events
+       ORDER BY date DESC`
+    );
+    res.json({ data: rows, total: rows.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
+});
 
+router.get('/:id', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, date, location, image, created_at
+       FROM events
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.put('/:id', requireAdmin, async (req, res) => {
   const { title, description, date, location, image } = req.body;
-  if (title) event.title = title;
-  if (description) event.description = description;
-  if (date) event.date = new Date(date);
-  if (location) event.location = location;
-  if (image !== undefined) event.image = image;
+  try {
+    const updates = [];
+    const values = [];
+    let index = 1;
 
-  res.json(event);
+    if (title) {
+      updates.push(`title = $${index++}`);
+      values.push(title);
+    }
+    if (description) {
+      updates.push(`description = $${index++}`);
+      values.push(description);
+    }
+    if (date) {
+      updates.push(`date = $${index++}`);
+      values.push(date);
+    }
+    if (location) {
+      updates.push(`location = $${index++}`);
+      values.push(location);
+    }
+    if (image !== undefined) {
+      updates.push(`image = $${index++}`);
+      values.push(image);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE events SET ${updates.join(', ')}
+       WHERE id = $${index}
+       RETURNING id, title, description, date, location, image, created_at`,
+      values
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
-// Supprimer un événement (admin only)
-router.delete('/:id', verifyAdmin, (req, res) => {
-  const index = events.findIndex(e => e.id === parseInt(req.params.id));
-  if (index === -1) {
-    return res.status(404).json({ error: 'Event not found' });
+router.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM events WHERE id = $1 RETURNING id',
+      [req.params.id]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    res.json({ message: 'Event deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-
-  const deleted = events.splice(index, 1);
-  res.json(deleted[0]);
 });
 
 module.exports = router;
