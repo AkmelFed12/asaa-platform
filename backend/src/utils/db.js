@@ -104,6 +104,11 @@ async function initializeSchema() {
     `);
 
     await client.query(`
+      ALTER TABLE member_photos
+      ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS member_photos_member_id_idx
         ON member_photos (member_id)
     `);
