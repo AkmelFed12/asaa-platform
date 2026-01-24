@@ -226,6 +226,19 @@ router.post('/daily/start', async (req, res, next) => {
 
   try {
     const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: completedRows } = await pool.query(
+      `SELECT id FROM daily_quiz_attempts
+       WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NOT NULL
+       LIMIT 1`,
+      [quizId, userId]
+    );
+
+    if (completedRows[0]) {
+      return res.status(409).json({
+        error: 'Quiz already completed today'
+      });
+    }
+
     const existing = await pool.query(
       `SELECT id FROM daily_quiz_attempts
        WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NULL`,

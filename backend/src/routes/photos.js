@@ -104,12 +104,25 @@ router.post('/event/:eventId/photo', requireAdmin, uploadSingle, async (req, res
 /**
  * Attach a photo to a member (persistent)
  */
-router.post('/member/:memberId/photo', requireAdmin, uploadSingle, async (req, res) => {
+router.post('/member/:memberId/photo', requireAuth, uploadSingle, async (req, res) => {
   try {
     const { memberId } = req.params;
 
     if (!req.file) {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
+    }
+
+    const memberCheck = await pool.query(
+      'SELECT user_id FROM members WHERE id = $1',
+      [memberId]
+    );
+    const member = memberCheck.rows[0];
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (req.user.role !== 'admin' && String(member.user_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const photoData = {

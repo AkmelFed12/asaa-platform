@@ -6,7 +6,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Quiz = ({ user }) => {
   const fallbackUserIdRef = useRef(`guest_${Date.now()}`);
-  const [status, setStatus] = useState('loading'); // loading, start, quiz, results
+  const [status, setStatus] = useState('loading'); // loading, start, quiz, results, closed, completed, error
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -53,6 +53,15 @@ const Quiz = ({ user }) => {
     return false;
   };
 
+  const handleQuizCompleted = (error) => {
+    if (error?.response?.status === 409 && error?.response?.data?.error === 'Quiz already completed today') {
+      setErrorMessage('');
+      setStatus('completed');
+      return true;
+    }
+    return false;
+  };
+
   // Timer
   useEffect(() => {
     if (status !== 'quiz' || answered) return;
@@ -77,7 +86,7 @@ const Quiz = ({ user }) => {
       setTimeLeft(10);
     } catch (error) {
       console.error('Error:', error);
-      if (!handleQuizClosed(error)) {
+      if (!handleQuizClosed(error) && !handleQuizCompleted(error)) {
         setErrorMessage('Erreur lors du demarrage du quiz.');
         setStatus('error');
       }
@@ -333,6 +342,20 @@ const Quiz = ({ user }) => {
             Retour à l'Accueil
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (status === 'completed') {
+    return (
+      <div className="quiz-container">
+        <div className="quiz-header-card">
+          <h2>Quiz deja complete</h2>
+          <p>Vous avez deja participe aujourd'hui. Revenez demain pour un nouveau quiz.</p>
+        </div>
+        <button className="quiz-retry-btn" onClick={() => window.location.reload()}>
+          Retour
+        </button>
       </div>
     );
   }
