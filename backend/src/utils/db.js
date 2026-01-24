@@ -97,6 +97,7 @@ async function initializeSchema() {
         filename TEXT NOT NULL,
         original_name TEXT NOT NULL,
         url TEXT NOT NULL,
+        data_url TEXT,
         size INTEGER NOT NULL,
         is_primary BOOLEAN NOT NULL DEFAULT FALSE,
         uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -106,6 +107,10 @@ async function initializeSchema() {
     await client.query(`
       ALTER TABLE member_photos
       ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+    await client.query(`
+      ALTER TABLE member_photos
+      ADD COLUMN IF NOT EXISTS data_url TEXT
     `);
 
     await client.query(`
@@ -120,6 +125,7 @@ async function initializeSchema() {
         filename TEXT NOT NULL,
         original_name TEXT NOT NULL,
         url TEXT NOT NULL,
+        data_url TEXT,
         size INTEGER NOT NULL,
         uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -128,6 +134,10 @@ async function initializeSchema() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS event_photos_event_id_idx
         ON event_photos (event_id)
+    `);
+    await client.query(`
+      ALTER TABLE event_photos
+      ADD COLUMN IF NOT EXISTS data_url TEXT
     `);
 
     await client.query(`

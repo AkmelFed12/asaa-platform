@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadSingle, uploadMultiple, getImageUrl, deleteImage } = require('../utils/photoUploadService');
+const { uploadSingle, uploadMultiple, getImageUrl, deleteImage, imageToBase64 } = require('../utils/photoUploadService');
 const { pool } = require('../utils/db');
 const { requireAdmin, requireAuth } = require('../middleware/auth');
 
@@ -24,11 +24,13 @@ router.post('/upload', (req, res, next) => {
     }
 
     const photoUrl = getImageUrl(req.file.filename);
+    const dataUrl = req.file ? await imageToBase64(req.file.path) : null;
     const photoData = {
       id: Date.now(),
       filename: req.file.filename,
       originalName: req.file.originalname,
       url: photoUrl,
+      dataUrl,
       size: req.file.size,
       uploadedAt: new Date()
     };
@@ -97,18 +99,20 @@ router.post('/event/:eventId/photo', requireAdmin, (req, res, next) => {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
     }
 
+    const dataUrl = req.file ? await imageToBase64(req.file.path) : null;
     const photoData = {
       filename: req.file.filename,
       originalName: req.file.originalname,
       url: getImageUrl(req.file.filename),
+      dataUrl,
       size: req.file.size
     };
 
     const { rows } = await pool.query(
-      `INSERT INTO event_photos (event_id, filename, original_name, url, size)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, event_id, filename, original_name, url, size, uploaded_at`,
-      [eventId, photoData.filename, photoData.originalName, photoData.url, photoData.size]
+      `INSERT INTO event_photos (event_id, filename, original_name, url, data_url, size)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, event_id, filename, original_name, COALESCE(data_url, url) AS url, size, uploaded_at`,
+      [eventId, photoData.filename, photoData.originalName, photoData.url, photoData.dataUrl, photoData.size]
     );
 
     res.json({
@@ -153,10 +157,12 @@ router.post('/member/:memberId/photo', requireAuth, (req, res, next) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const dataUrl = req.file ? await imageToBase64(req.file.path) : null;
     const photoData = {
       filename: req.file.filename,
       originalName: req.file.originalname,
       url: getImageUrl(req.file.filename),
+      dataUrl,
       size: req.file.size
     };
 
@@ -167,10 +173,18 @@ router.post('/member/:memberId/photo', requireAuth, (req, res, next) => {
     const shouldBePrimary = primaryRows[0].count === 0;
 
     const { rows } = await pool.query(
-      `INSERT INTO member_photos (member_id, filename, original_name, url, size, is_primary)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, member_id, filename, original_name, url, size, is_primary, uploaded_at`,
-      [memberId, photoData.filename, photoData.originalName, photoData.url, photoData.size, shouldBePrimary]
+      `INSERT INTO member_photos (member_id, filename, original_name, url, data_url, size, is_primary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, member_id, filename, original_name, COALESCE(data_url, url) AS url, size, is_primary, uploaded_at`,
+      [
+        memberId,
+        photoData.filename,
+        photoData.originalName,
+        photoData.url,
+        photoData.dataUrl,
+        photoData.size,
+        shouldBePrimary
+      ]
     );
 
     res.json({
@@ -191,7 +205,7 @@ router.get('/event/:eventId/photos', async (req, res) => {
   try {
     const { eventId } = req.params;
     const { rows } = await pool.query(
-      `SELECT id, event_id, filename, original_name, url, size, uploaded_at
+      `SELECT id, event_id, filename, original_name, COALESCE(data_url, url) AS url, size, uploaded_at
        FROM event_photos
        WHERE event_id = $1
        ORDER BY uploaded_at DESC`,
@@ -215,7 +229,7 @@ router.get('/member/:memberId/photos', requireAuth, async (req, res) => {
   try {
     const { memberId } = req.params;
     const { rows } = await pool.query(
-      `SELECT id, member_id, filename, original_name, url, size, is_primary, uploaded_at
+      `SELECT id, member_id, filename, original_name, COALESCE(data_url, url) AS url, size, is_primary, uploaded_at
        FROM member_photos
        WHERE member_id = $1
        ORDER BY uploaded_at DESC`,
@@ -256,7 +270,7 @@ router.put('/member/:memberId/primary/:photoId', requireAuth, async (req, res) =
       `UPDATE member_photos
        SET is_primary = TRUE
        WHERE id = $1 AND member_id = $2
-       RETURNING id, member_id, filename, original_name, url, size, is_primary, uploaded_at`,
+       RETURNING id, member_id, filename, original_name, COALESCE(data_url, url) AS url, size, is_primary, uploaded_at`,
       [photoId, memberId]
     );
     if (!rows[0]) {
@@ -366,7 +380,7 @@ router.get('/search', requireAdmin, async (req, res) => {
   try {
     const like = `%${query.toLowerCase()}%`;
     const { rows } = await pool.query(
-      `SELECT id, member_id, filename, original_name, url, size, is_primary, uploaded_at
+      `SELECT id, member_id, filename, original_name, COALESCE(data_url, url) AS url, size, is_primary, uploaded_at
        FROM member_photos
        WHERE LOWER(filename) LIKE $1
           OR LOWER(original_name) LIKE $1
