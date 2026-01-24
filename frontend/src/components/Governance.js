@@ -12,7 +12,8 @@ function Governance({ isAdmin }) {
     position_name: '',
     position_type: '',
     description: '',
-    holder_name: 'À pourvoir',
+    holder_name: 'A pourvoir',
+    holder_contact: '',
     holder_email: ''
   });
 
@@ -33,8 +34,9 @@ function Governance({ isAdmin }) {
     setEditingId(position.id);
     setEditData({
       holder_name: position.holder_name,
-      holder_email: position.holder_email,
-      description: position.description
+      holder_contact: position.holder_contact || '',
+      holder_email: position.holder_email || '',
+      description: position.description || ''
     });
   };
 
@@ -44,9 +46,9 @@ function Governance({ isAdmin }) {
       await governanceService.update(id, editData);
       await loadPositions();
       setEditingId(null);
-      alert('Poste mis à jour avec succès!');
+      alert('Poste mis a jour avec succes!');
     } catch (error) {
-      alert('Erreur lors de la mise à jour');
+      alert('Erreur lors de la mise a jour');
     } finally {
       setLoading(false);
     }
@@ -72,12 +74,13 @@ function Governance({ isAdmin }) {
         position_name: '',
         position_type: '',
         description: '',
-        holder_name: 'À pourvoir',
+        holder_name: 'A pourvoir',
+        holder_contact: '',
         holder_email: ''
       });
-      alert('Nouveau poste ajouté avec succès!');
+      alert('Nouveau poste ajoute avec succes!');
     } catch (error) {
-      alert('Erreur lors de la création du poste');
+      alert('Erreur lors de la creation du poste');
       console.error(error);
     } finally {
       setLoading(false);
@@ -90,12 +93,12 @@ function Governance({ isAdmin }) {
       return;
     }
 
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce poste?')) {
+    if (window.confirm('Etes-vous sur de vouloir supprimer ce poste?')) {
       setLoading(true);
       try {
         await governanceService.delete(id);
         await loadPositions();
-        alert('Poste supprimé avec succès!');
+        alert('Poste supprime avec succes!');
       } catch (error) {
         alert('Erreur lors de la suppression du poste');
         console.error(error);
@@ -107,16 +110,16 @@ function Governance({ isAdmin }) {
 
   return (
     <div className="governance-container">
-      <h2>📋 Structure de Gouvernance - ASAA</h2>
+      <h2>Structure de Gouvernance - ASAA</h2>
       <p className="subtitle">Association des Serviteurs d'Allah Azawajal</p>
 
       {isAdmin && (
         <div className="admin-controls">
-          <button 
+          <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="add-position-btn"
           >
-            {showAddForm ? '✖ Annuler' : '➕ Ajouter un nouveau poste'}
+            {showAddForm ? 'Annuler' : 'Ajouter un nouveau poste'}
           </button>
         </div>
       )}
@@ -128,9 +131,9 @@ function Governance({ isAdmin }) {
             <label>Nom du poste *</label>
             <input
               type="text"
-              placeholder="Ex: Délégué Jeunesse"
+              placeholder="Ex: Delegue Jeunesse"
               value={newPosition.position_name}
-              onChange={(e) => setNewPosition({...newPosition, position_name: e.target.value})}
+              onChange={(e) => setNewPosition({ ...newPosition, position_name: e.target.value })}
             />
           </div>
           <div className="form-group">
@@ -139,24 +142,33 @@ function Governance({ isAdmin }) {
               type="text"
               placeholder="Ex: delegue_jeunesse"
               value={newPosition.position_type}
-              onChange={(e) => setNewPosition({...newPosition, position_type: e.target.value})}
+              onChange={(e) => setNewPosition({ ...newPosition, position_type: e.target.value })}
             />
           </div>
           <div className="form-group">
             <label>Description</label>
             <textarea
-              placeholder="Description du rôle et des responsabilités"
+              placeholder="Description du role et des responsabilites"
               value={newPosition.description}
-              onChange={(e) => setNewPosition({...newPosition, description: e.target.value})}
+              onChange={(e) => setNewPosition({ ...newPosition, description: e.target.value })}
             />
           </div>
           <div className="form-group">
             <label>Nom du titulaire</label>
             <input
               type="text"
-              placeholder="Laissez vide pour 'À pourvoir'"
+              placeholder="Laissez vide pour 'A pourvoir'"
               value={newPosition.holder_name}
-              onChange={(e) => setNewPosition({...newPosition, holder_name: e.target.value || 'À pourvoir'})}
+              onChange={(e) => setNewPosition({ ...newPosition, holder_name: e.target.value || 'A pourvoir' })}
+            />
+          </div>
+          <div className="form-group">
+            <label>Contact</label>
+            <input
+              type="text"
+              placeholder="Numero de telephone"
+              value={newPosition.holder_contact}
+              onChange={(e) => setNewPosition({ ...newPosition, holder_contact: e.target.value })}
             />
           </div>
           <div className="form-group">
@@ -165,18 +177,18 @@ function Governance({ isAdmin }) {
               type="email"
               placeholder="Email du responsable"
               value={newPosition.holder_email}
-              onChange={(e) => setNewPosition({...newPosition, holder_email: e.target.value})}
+              onChange={(e) => setNewPosition({ ...newPosition, holder_email: e.target.value })}
             />
           </div>
           <div className="button-group">
-            <button 
+            <button
               onClick={handleAddPosition}
               disabled={loading}
               className="save-btn"
             >
-              Créer le poste
+              Creer le poste
             </button>
-            <button 
+            <button
               onClick={() => setShowAddForm(false)}
               className="cancel-btn"
             >
@@ -197,7 +209,15 @@ function Governance({ isAdmin }) {
                   <input
                     type="text"
                     value={editData.holder_name}
-                    onChange={(e) => setEditData({...editData, holder_name: e.target.value})}
+                    onChange={(e) => setEditData({ ...editData, holder_name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Contact</label>
+                  <input
+                    type="text"
+                    value={editData.holder_contact || ''}
+                    onChange={(e) => setEditData({ ...editData, holder_contact: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
@@ -205,25 +225,25 @@ function Governance({ isAdmin }) {
                   <input
                     type="email"
                     value={editData.holder_email || ''}
-                    onChange={(e) => setEditData({...editData, holder_email: e.target.value})}
+                    onChange={(e) => setEditData({ ...editData, holder_email: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
                   <label>Description</label>
                   <textarea
                     value={editData.description}
-                    onChange={(e) => setEditData({...editData, description: e.target.value})}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                   />
                 </div>
                 <div className="button-group">
-                  <button 
+                  <button
                     onClick={() => handleSave(position.id)}
                     disabled={loading}
                     className="save-btn"
                   >
                     Enregistrer
                   </button>
-                  <button 
+                  <button
                     onClick={handleCancel}
                     className="cancel-btn"
                   >
@@ -235,24 +255,27 @@ function Governance({ isAdmin }) {
               <>
                 <h3>{position.position_name}</h3>
                 <p className="holder-name">
-                  {position.holder_name === 'À pourvoir' ? (
-                    <span className="vacant">À pourvoir</span>
+                  {position.holder_name === 'A pourvoir' ? (
+                    <span className="vacant">A pourvoir</span>
                   ) : (
                     position.holder_name
                   )}
                 </p>
+                {position.holder_contact && (
+                  <p className="holder-email">{position.holder_contact}</p>
+                )}
                 {position.holder_email && (
                   <p className="holder-email">{position.holder_email}</p>
                 )}
                 <p className="description">{position.description}</p>
-                
+
                 {isAdmin && (
                   <div className="action-buttons">
                     <button
                       onClick={() => handleEdit(position)}
                       className="edit-btn"
                     >
-                      ✏️ Modifier
+                      Modifier
                     </button>
                     {position.id > 3 && (
                       <button
@@ -260,7 +283,7 @@ function Governance({ isAdmin }) {
                         className="delete-btn"
                         disabled={loading}
                       >
-                        🗑️ Supprimer
+                        Supprimer
                       </button>
                     )}
                   </div>

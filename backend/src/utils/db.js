@@ -126,6 +126,19 @@ async function initializeSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS governance_positions (
+        id BIGSERIAL PRIMARY KEY,
+        position_type TEXT NOT NULL UNIQUE,
+        position_name TEXT NOT NULL,
+        description TEXT,
+        holder_name TEXT NOT NULL DEFAULT 'A pourvoir',
+        holder_contact TEXT,
+        holder_email TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id BIGSERIAL PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
@@ -197,6 +210,48 @@ async function initializeSchema() {
         [adminEmail, passwordHash, 'Admin', 'ASAA']
       );
       console.log(`Seeded admin user: ${adminEmail}`);
+    }
+
+    const { rows: governanceCount } = await client.query(
+      'SELECT COUNT(*)::int AS count FROM governance_positions'
+    );
+    if (governanceCount[0].count === 0) {
+      const seedPositions = [
+        ['president', 'PRESIDENT', 'DIARRA SIDI', '0779382233'],
+        ['vice_president', 'VICE PRESIDENT', 'BAH ALI MOHAMED', '0151495971'],
+        ['secretaire_general', 'SECRETAIRE GENERAL', 'OUATTARA LADJI MOUSSA', '0574724233'],
+        ['secretaire_adjointe_1', 'SECRETAIRE ADJOINTE 1', 'DIALLO MARIAMA', '0556570839'],
+        ['secretaire_adjointe_2', 'SECRETAIRE ADJOINTE 2', 'FONANA NAWA', '0151473002'],
+        ['delegue_culturel', 'DELEGUE CULTUREL', 'ADIANGO OUMAR', '0556742119'],
+        ['delegue_culturel_adjoint_1', 'DELEGUE CULTUREL ADJOINT 1', 'OUEDRAOGO ABDOUL RAHIM', '0574044371'],
+        ['delegue_culturel_adjointe_2', 'DELEGUE CULTUREL ADJOINTE 2', 'BAH ZAYNAB', '0749527280'],
+        ['delegue_culturel_adjointe_3', 'DELEGUE CULTUREL ADJOINTE 3', 'KONATE SARATA', '0501169530'],
+        ['delegue_social', 'DELEGUE SOCIAL', 'GBANE KARAMOKO', '0789036052'],
+        ['delegue_social_adjoint_1', 'DELEGUE SOCIAL ADJOINT 1', 'ADIANGO OUMAR', '0143577046'],
+        ['delegue_social_adjoint_2', 'DELEGUE SOCIAL ADJOINT 2', 'TRAORE TALBI', '0778923992'],
+        ['delegue_social_adjointe_3', 'DELEGUE SOCIAL ADJOINTE 3', 'MARIAMA BOUBACAR', '0768604304'],
+        ['delegue_social_adjointe_4', 'DELEGUE SOCIAL ADJOINTE 4', 'DIARRA SOUBA BINTA', '0101039771'],
+        ['delegue_social_adjointe_5', 'DELEGUE SOCIAL ADJOINTE 5', 'ZEYNABOU SIDIBE', '0584031423'],
+        ['delegue_social_adjointe_6', 'DELEGUE SOCIAL ADJOINTE 6', 'OUATTARA NAFISSAT LADY', '0759444639'],
+        ['delegue_mobilisation', 'DELEGUE DE MOBILISATION', 'KONATE NOURA', '0574641065'],
+        ['delegue_mobilisation_adjointe_1', 'DELEGUE DE MOBILISATION ADJOINTE 1', 'COULIBALY MADOUSSOU', '0171389479'],
+        ['delegue_mobilisation_adjoint_2', 'DELEGUE DE MOBILISATION ADJOINT 2', 'SANA ABDOUL JALIL', '0596796476'],
+        ['delegue_mobilisation_adjointe_3', 'DELEGUE DE MOBILISATION ADJOINTE 3', 'FATIM DIALLO', '0103699431'],
+        ['delegue_mobilisation_adjointe_4', 'DELEGUE DE MOBILISATION ADJOINTE 4', 'KONE ADJARA', '0141671274'],
+        ['tresoriere', 'TRESORIERE', 'BELLO AMINATA', '0769834455'],
+        ['tresoriere_adjoint_1', 'TRESORIERE ADJOINT 1', 'DIARRA FOUNE', '0797818327'],
+        ['tresoriere_adjoint_2', 'TRESORIERE ADJOINT 2', 'QUATTARA ROUKIYA', '05642348165']
+      ];
+
+      for (const [positionType, positionName, holderName, holderContact] of seedPositions) {
+        await client.query(
+          `INSERT INTO governance_positions (position_type, position_name, holder_name, holder_contact)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (position_type) DO NOTHING`,
+          [positionType, positionName, holderName, holderContact]
+        );
+      }
+      console.log(`Seeded ${seedPositions.length} governance positions.`);
     }
 
     await client.query('COMMIT');
