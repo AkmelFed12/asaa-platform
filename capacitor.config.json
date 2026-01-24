@@ -1,6 +1,0 @@
-{
-  "appId": "com.asaa.platform",
-  "appName": "ASAA Platform",
-  "webDir": "frontend/build",
-  "bundledWebRuntime": false
-}
