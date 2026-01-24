@@ -15,6 +15,8 @@ const Quiz = ({ user }) => {
   const [userResult, setUserResult] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [selectedOption, setSelectedOption] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [openWindow, setOpenWindow] = useState({ from: '20:00', until: '23:59' });
   const resolvedUserId = user?.id || fallbackUserIdRef.current;
   const resolvedName = user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Participant';
 
@@ -30,8 +32,25 @@ const Quiz = ({ user }) => {
       setStatus('start');
     } catch (error) {
       console.error('Error:', error);
-      setStatus('error');
+      if (!handleQuizClosed(error)) {
+        setErrorMessage('Erreur lors du chargement du quiz.');
+        setStatus('error');
+      }
     }
+  };
+
+  const handleQuizClosed = (error) => {
+    const data = error?.response?.data;
+    if (error?.response?.status === 403 && data?.error === 'Quiz closed') {
+      setOpenWindow({
+        from: data.openFrom || '20:00',
+        until: data.openUntil || '23:59'
+      });
+      setErrorMessage('');
+      setStatus('closed');
+      return true;
+    }
+    return false;
   };
 
   // Timer
@@ -58,6 +77,10 @@ const Quiz = ({ user }) => {
       setTimeLeft(10);
     } catch (error) {
       console.error('Error:', error);
+      if (!handleQuizClosed(error)) {
+        setErrorMessage('Erreur lors du demarrage du quiz.');
+        setStatus('error');
+      }
     }
   };
 
@@ -89,6 +112,10 @@ const Quiz = ({ user }) => {
       }, 1500);
     } catch (error) {
       console.error('Error:', error);
+      if (!handleQuizClosed(error)) {
+        setErrorMessage('Erreur lors de l\'envoi de la reponse.');
+        setStatus('error');
+      }
     }
   };
 
@@ -103,6 +130,10 @@ const Quiz = ({ user }) => {
       setStatus('results');
     } catch (error) {
       console.error('Error:', error);
+      if (!handleQuizClosed(error)) {
+        setErrorMessage('Erreur lors de la cloture du quiz.');
+        setStatus('error');
+      }
     }
   };
 
@@ -112,6 +143,10 @@ const Quiz = ({ user }) => {
       setLeaderboard(response.data.leaderboard);
     } catch (error) {
       console.error('Error:', error);
+      if (!handleQuizClosed(error)) {
+        setErrorMessage('Erreur lors du chargement du classement.');
+        setStatus('error');
+      }
     }
   };
 
@@ -298,6 +333,34 @@ const Quiz = ({ user }) => {
             Retour à l'Accueil
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (status === 'closed') {
+    return (
+      <div className="quiz-container">
+        <div className="quiz-header-card">
+          <h2>Quiz ferme</h2>
+          <p>Disponible tous les jours de {openWindow.from} a {openWindow.until}.</p>
+        </div>
+        <button className="quiz-retry-btn" onClick={() => window.location.reload()}>
+          Reessayer
+        </button>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="quiz-container">
+        <div className="quiz-header-card">
+          <h2>Erreur</h2>
+          <p>{errorMessage || 'Une erreur est survenue.'}</p>
+        </div>
+        <button className="quiz-retry-btn" onClick={() => window.location.reload()}>
+          Reessayer
+        </button>
       </div>
     );
   }
