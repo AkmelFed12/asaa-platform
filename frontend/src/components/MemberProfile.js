@@ -45,6 +45,20 @@ const MemberProfile = ({ user }) => {
     }
   };
 
+  const deletePhoto = async (photoId) => {
+    if (!photoId) return;
+    if (!window.confirm('Supprimer cette photo?')) return;
+    setLoading(true);
+    try {
+      await apiClient.delete(`/api/photos/photo/${photoId}`);
+      await loadPhotos(member.id);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadMember();
   }, [user?.id]);
@@ -58,7 +72,7 @@ const MemberProfile = ({ user }) => {
   if (!member) {
     return (
       <div className="governance-container">
-        <h2>👤 Profil</h2>
+        <h2>Profil</h2>
         <p>Profil membre introuvable.</p>
       </div>
     );
@@ -75,11 +89,11 @@ const MemberProfile = ({ user }) => {
 
   return (
     <div className="governance-container">
-      <h2>👤 Profil Membre</h2>
+      <h2>Profil Membre</h2>
       <p className="subtitle">{member.first_name} {member.last_name}</p>
 
       {primaryPhoto && (
-        <div className="uploaded-photo">
+        <div className="uploaded-photo profile-photo">
           <img src={normalizePhotoUrl(primaryPhoto.url)} alt={primaryPhoto.filename} />
           <p className="photo-name">Photo principale</p>
         </div>
@@ -88,7 +102,7 @@ const MemberProfile = ({ user }) => {
       <div className="admin-section">
         <h3>Infos</h3>
         <p>Email: {member.email}</p>
-        <p>Numéro membre: {member.member_number}</p>
+        <p>Numero membre: {member.member_number}</p>
         <p>Ville: {member.city || '-'}</p>
         <p>Date de naissance: {member.date_of_birth ? member.date_of_birth.split('T')[0] : '-'}</p>
       </div>
@@ -112,7 +126,15 @@ const MemberProfile = ({ user }) => {
                   onClick={() => setPrimaryPhoto(photo.id)}
                   disabled={loading}
                 >
-                  {photo.is_primary ? 'Principale' : 'Définir principale'}
+                  {photo.is_primary ? 'Principale' : 'Definir principale'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-action btn-delete"
+                  onClick={() => deletePhoto(photo.id)}
+                  disabled={loading}
+                >
+                  Supprimer
                 </button>
               </div>
             ))}

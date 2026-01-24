@@ -197,6 +197,15 @@
   display: block;
 }
 
+.profile-photo {
+  max-width: 520px;
+  margin: 0 auto 20px;
+}
+
+.profile-photo img {
+  max-height: 520px;
+}
+
 .photo-name {
   font-size: 11px;
   padding: 6px 4px 2px;

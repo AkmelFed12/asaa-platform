@@ -286,7 +286,7 @@ router.put('/member/:memberId/primary/:photoId', requireAuth, async (req, res) =
 /**
  * Delete a photo (event or member)
  */
-router.delete('/photo/:photoId', requireAdmin, async (req, res) => {
+router.delete('/photo/:photoId', requireAuth, async (req, res) => {
   try {
     const { photoId } = req.params;
 
@@ -294,8 +294,11 @@ router.delete('/photo/:photoId', requireAdmin, async (req, res) => {
     for (const eventId in eventPhotos) {
       eventPhotos[eventId] = eventPhotos[eventId].filter(photo => {
         if (photo.id === parseInt(photoId, 10)) {
-          deleteImage(photo.filename);
-          deleted = true;
+          if (req.user.role === 'admin') {
+            deleteImage(photo.filename);
+            deleted = true;
+            return false;
+          }
           return false;
         }
         return true;
@@ -307,16 +310,25 @@ router.delete('/photo/:photoId', requireAdmin, async (req, res) => {
       [photoId]
     );
     if (eventRows[0]) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
       await pool.query('DELETE FROM event_photos WHERE id = $1', [photoId]);
       deleteImage(eventRows[0].filename);
       deleted = true;
     }
 
     const { rows: memberRows } = await pool.query(
-      'SELECT id, filename FROM member_photos WHERE id = $1',
+      `SELECT mp.id, mp.filename, m.user_id
+       FROM member_photos mp
+       JOIN members m ON m.id::text = mp.member_id
+       WHERE mp.id = $1`,
       [photoId]
     );
     if (memberRows[0]) {
+      if (req.user.role !== 'admin' && String(memberRows[0].user_id) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
       await pool.query('DELETE FROM member_photos WHERE id = $1', [photoId]);
       deleteImage(memberRows[0].filename);
       deleted = true;
