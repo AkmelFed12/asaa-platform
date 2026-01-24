@@ -18,6 +18,13 @@ const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const normalizePhotoUrl = (url) => {
+    if (!url) return url;
+    if (url.startsWith('/uploads/')) {
+      return `${API_URL}${url}`;
+    }
+    return url;
+  };
 
   // Handle file selection
   const handleFileSelect = (event) => {
@@ -238,7 +245,7 @@ const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }
           <div className="photos-grid">
             {uploadedPhotos.map((photo, idx) => (
               <div key={idx} className="uploaded-photo">
-                <img src={photo.url} alt={photo.filename} />
+                <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
                 <p className="photo-name">{photo.filename}</p>
                 <p className="photo-size">
                   {(photo.size / 1024).toFixed(2)} KB

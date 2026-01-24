@@ -3,6 +3,8 @@ import apiClient from '../services/api';
 import PhotoUpload from './PhotoUpload';
 import '../styles/PhotoUpload.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const MemberProfile = ({ user }) => {
   const [member, setMember] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -63,6 +65,13 @@ const MemberProfile = ({ user }) => {
   }
 
   const primaryPhoto = photos.find((photo) => photo.is_primary);
+  const normalizePhotoUrl = (url) => {
+    if (!url) return url;
+    if (url.startsWith('/uploads/')) {
+      return `${API_URL}${url}`;
+    }
+    return url;
+  };
 
   return (
     <div className="governance-container">
@@ -71,7 +80,7 @@ const MemberProfile = ({ user }) => {
 
       {primaryPhoto && (
         <div className="uploaded-photo">
-          <img src={primaryPhoto.url} alt={primaryPhoto.filename} />
+          <img src={normalizePhotoUrl(primaryPhoto.url)} alt={primaryPhoto.filename} />
           <p className="photo-name">Photo principale</p>
         </div>
       )}
@@ -95,7 +104,7 @@ const MemberProfile = ({ user }) => {
           <div className="photos-grid">
             {photos.map((photo) => (
               <div key={photo.id} className="uploaded-photo">
-                <img src={photo.url} alt={photo.filename} />
+                <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
                 <p className="photo-name">{photo.original_name}</p>
                 <button
                   type="button"

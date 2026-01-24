@@ -53,6 +53,13 @@ const Admin = ({ isAdmin }) => {
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
   });
+  const normalizePhotoUrl = (url) => {
+    if (!url) return url;
+    if (url.startsWith('/uploads/')) {
+      return `${API_URL}${url}`;
+    }
+    return url;
+  };
 
   const loadData = async () => {
     try {
@@ -714,7 +721,7 @@ const Admin = ({ isAdmin }) => {
               <div className="photos-grid">
                 {memberPhotos.map((photo) => (
                   <div key={photo.id} className="uploaded-photo">
-                    <img src={photo.url} alt={photo.filename} />
+                    <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
                     <p className="photo-name">{photo.filename}</p>
                     <button
                       type="button"
@@ -857,7 +864,7 @@ const Admin = ({ isAdmin }) => {
               <div className="photos-grid">
                 {photoSearchResults.map((photo) => (
                   <div key={photo.id} className="uploaded-photo">
-                    <img src={photo.url} alt={photo.filename} />
+                    <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
                     <p className="photo-name">{photo.original_name}</p>
                     <p className="photo-size">Membre: {photo.member_id}</p>
                     <button

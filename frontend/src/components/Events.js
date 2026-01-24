@@ -3,6 +3,13 @@ import axios from 'axios';
 import '../styles/Events.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const normalizeImageUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith('/uploads/')) {
+    return `${API_URL}${url}`;
+  }
+  return url;
+};
 
 const Events = ({ isAdmin }) => {
   const [events, setEvents] = useState([]);
@@ -80,7 +87,7 @@ const Events = ({ isAdmin }) => {
     <div className="event-card">
       {event.image && (
         <div className="event-image">
-          <img src={event.image} alt={event.title} />
+          <img src={normalizeImageUrl(event.image)} alt={event.title} />
         </div>
       )}
       <div className="event-content">
