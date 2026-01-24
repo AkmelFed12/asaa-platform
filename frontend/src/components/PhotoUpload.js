@@ -68,6 +68,16 @@ const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }
     });
   };
 
+  const parseErrorResponse = async (response) => {
+    try {
+      const data = await response.json();
+      return data?.error || `Upload failed (${response.status})`;
+    } catch (parseError) {
+      const text = await response.text();
+      return text || `Upload failed (${response.status})`;
+    }
+  };
+
   // Upload photos
   const handleUpload = async () => {
     if (files.length === 0) {
@@ -101,7 +111,8 @@ const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }
         });
 
         if (!response.ok) {
-          throw new Error('Upload failed');
+          const message = await parseErrorResponse(response);
+          throw new Error(message);
         }
 
         const data = await response.json();
@@ -127,7 +138,8 @@ const PhotoUpload = ({ eventId = null, memberId = null, onUploadSuccess = null }
         });
 
         if (!response.ok) {
-          throw new Error('Upload failed');
+          const message = await parseErrorResponse(response);
+          throw new Error(message);
         }
 
         const data = await response.json();

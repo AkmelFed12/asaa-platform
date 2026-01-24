@@ -10,7 +10,14 @@ let eventPhotos = {};
 /**
  * Upload a generic photo
  */
-router.post('/upload', uploadSingle, (req, res) => {
+router.post('/upload', (req, res, next) => {
+  uploadSingle(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next();
+  });
+}, (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
@@ -39,7 +46,14 @@ router.post('/upload', uploadSingle, (req, res) => {
 /**
  * Upload multiple photos
  */
-router.post('/upload-multiple', uploadMultiple, (req, res) => {
+router.post('/upload-multiple', (req, res, next) => {
+  uploadMultiple(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next();
+  });
+}, (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
@@ -68,7 +82,14 @@ router.post('/upload-multiple', uploadMultiple, (req, res) => {
 /**
  * Attach a photo to an event (in-memory)
  */
-router.post('/event/:eventId/photo', requireAdmin, uploadSingle, async (req, res) => {
+router.post('/event/:eventId/photo', requireAdmin, (req, res, next) => {
+  uploadSingle(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { eventId } = req.params;
 
@@ -104,7 +125,14 @@ router.post('/event/:eventId/photo', requireAdmin, uploadSingle, async (req, res
 /**
  * Attach a photo to a member (persistent)
  */
-router.post('/member/:memberId/photo', requireAuth, uploadSingle, async (req, res) => {
+router.post('/member/:memberId/photo', requireAuth, (req, res, next) => {
+  uploadSingle(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { memberId } = req.params;
 
