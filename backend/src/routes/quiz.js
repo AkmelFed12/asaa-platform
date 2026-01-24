@@ -8,8 +8,46 @@ const { requireAdmin } = require('../middleware/auth');
 
 const DAILY_QUESTION_COUNT = 20;
 const TIME_PER_QUESTION = 10;
+const QUIZ_OPEN_HOUR = 20;
+const QUIZ_CLOSE_HOUR = 23;
+const QUIZ_CLOSE_MINUTE = 59;
+const QUIZ_TIMEZONE = 'Africa/Abidjan';
 
 const getToday = () => new Date().toISOString().split('T')[0];
+const getTimeInZone = (now, timeZone) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  }).formatToParts(now);
+  const hour = Number(parts.find(part => part.type === 'hour')?.value || 0);
+  const minute = Number(parts.find(part => part.type === 'minute')?.value || 0);
+  return { hour, minute };
+};
+
+const isQuizOpen = (now = new Date()) => {
+  const { hour, minute } = getTimeInZone(now, QUIZ_TIMEZONE);
+
+  if (hour < QUIZ_OPEN_HOUR) return false;
+  if (hour > QUIZ_CLOSE_HOUR) return false;
+  if (hour === QUIZ_CLOSE_HOUR && minute > QUIZ_CLOSE_MINUTE) return false;
+
+  return true;
+};
+
+const ensureQuizOpen = (res) => {
+  if (isQuizOpen()) {
+    return true;
+  }
+
+  res.status(403).json({
+    error: 'Quiz closed',
+    openFrom: '20:00',
+    openUntil: '23:59'
+  });
+  return false;
+};
 
 async function getOrCreateDailyQuiz() {
   const quizDate = getToday();
@@ -156,6 +194,10 @@ async function getWeeklyRank(userId) {
 }
 
 router.get('/daily/quiz', async (req, res, next) => {
+  if (!ensureQuizOpen(res)) {
+    return;
+  }
+
   try {
     const { quizId, quizDate } = await getOrCreateDailyQuiz();
     const questions = await getDailyQuestions(quizId);
@@ -173,6 +215,10 @@ router.get('/daily/quiz', async (req, res, next) => {
 });
 
 router.post('/daily/start', async (req, res, next) => {
+  if (!ensureQuizOpen(res)) {
+    return;
+  }
+
   const { userId, email, name } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
@@ -212,6 +258,10 @@ router.post('/daily/start', async (req, res, next) => {
 });
 
 router.post('/daily/answer', async (req, res, next) => {
+  if (!ensureQuizOpen(res)) {
+    return;
+  }
+
   const { userId, questionIndex, selectedIndex, timeSpent } = req.body;
 
   if (userId === undefined || questionIndex === undefined) {
@@ -288,6 +338,10 @@ router.post('/daily/answer', async (req, res, next) => {
 });
 
 router.post('/daily/complete', async (req, res, next) => {
+  if (!ensureQuizOpen(res)) {
+    return;
+  }
+
   const { userId } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
