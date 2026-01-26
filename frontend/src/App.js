@@ -166,10 +166,30 @@ function App() {
               <h3>Contact rapide</h3>
               <p>Téléphone :</p>
               <ul>
-                <li>0574724233</li>
-                <li>0705583082</li>
-                <li>0779382233</li>
-                <li>0151495971</li>
+                <li>
+                  0574724233
+                  <a className="whatsapp-link" href="https://wa.me/2250574724233" target="_blank" rel="noreferrer">
+                    WhatsApp
+                  </a>
+                </li>
+                <li>
+                  0705583082
+                  <a className="whatsapp-link" href="https://wa.me/2250705583082" target="_blank" rel="noreferrer">
+                    WhatsApp
+                  </a>
+                </li>
+                <li>
+                  0779382233
+                  <a className="whatsapp-link" href="https://wa.me/2250779382233" target="_blank" rel="noreferrer">
+                    WhatsApp
+                  </a>
+                </li>
+                <li>
+                  0151495971
+                  <a className="whatsapp-link" href="https://wa.me/2250151495971" target="_blank" rel="noreferrer">
+                    WhatsApp
+                  </a>
+                </li>
               </ul>
               <p>Disponibilité : 08h00 - 18h00</p>
             </div>
