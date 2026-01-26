@@ -214,6 +214,109 @@ router.get('/daily/quiz', async (req, res, next) => {
   }
 });
 
+router.get('/daily/admin/quiz', requireAdmin, async (req, res, next) => {
+  try {
+    const { quizId, quizDate } = await getOrCreateDailyQuiz();
+    const { rows } = await pool.query(
+      `SELECT dq.position, q.id, q.question_text, q.options, q.difficulty
+       FROM daily_quiz_questions dq
+       JOIN quiz_questions q ON q.id = dq.question_id
+       WHERE dq.quiz_id = $1
+       ORDER BY dq.position`,
+      [quizId]
+    );
+
+    res.json({
+      success: true,
+      date: quizDate,
+      questions: rows.map((row) => ({
+        id: row.id,
+        position: row.position,
+        question: row.question_text,
+        options: row.options,
+        difficulty: row.difficulty
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/daily/admin/reorder', requireAdmin, async (req, res, next) => {
+  const { order } = req.body;
+  if (!Array.isArray(order) || order.length === 0) {
+    return res.status(400).json({ error: 'Order array required' });
+  }
+
+  const normalizedOrder = order.map((id) => Number(id));
+  if (normalizedOrder.some((id) => Number.isNaN(id))) {
+    return res.status(400).json({ error: 'Order must contain valid question ids' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: attemptRows } = await client.query(
+      'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
+      [quizId]
+    );
+
+    if (attemptRows[0].count > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Quiz already started' });
+    }
+
+    const { rows: existingRows } = await client.query(
+      'SELECT question_id FROM daily_quiz_questions WHERE quiz_id = $1',
+      [quizId]
+    );
+
+    const existingIds = existingRows.map((row) => row.question_id);
+    if (existingIds.length !== normalizedOrder.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Order length mismatch' });
+    }
+
+    const existingSet = new Set(existingIds);
+    for (const id of normalizedOrder) {
+      if (!existingSet.has(id)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Order does not match daily quiz' });
+      }
+    }
+
+    const values = [];
+    const placeholders = normalizedOrder.map((id, index) => {
+      const offset = index * 2;
+      values.push(id, index);
+      return `($${offset + 1}, $${offset + 2})`;
+    });
+    values.push(quizId);
+
+    await client.query(
+      `WITH new_positions (question_id, position) AS (
+         VALUES ${placeholders.join(', ')}
+       )
+       UPDATE daily_quiz_questions dq
+       SET position = np.position
+       FROM new_positions np
+       WHERE dq.quiz_id = $${values.length}
+         AND dq.question_id = np.question_id`,
+      values
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/daily/start', async (req, res, next) => {
   if (!ensureQuizOpen(res)) {
     return;

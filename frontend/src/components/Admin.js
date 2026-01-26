@@ -22,6 +22,11 @@ const Admin = ({ isAdmin }) => {
     correctIndex: 0,
     difficulty: 'easy'
   });
+  const [dailyQuizQuestions, setDailyQuizQuestions] = useState([]);
+  const [dailyQuizDate, setDailyQuizDate] = useState('');
+  const [dailyQuizLoading, setDailyQuizLoading] = useState(false);
+  const [dailyQuizError, setDailyQuizError] = useState('');
+  const [dailyQuizSaving, setDailyQuizSaving] = useState(false);
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -49,6 +54,12 @@ const Admin = ({ isAdmin }) => {
       loadEvents();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && adminView === 'quiz') {
+      loadDailyQuizAdmin();
+    }
+  }, [isAdmin, adminView]);
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
@@ -187,6 +198,58 @@ const Admin = ({ isAdmin }) => {
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de la création de la question');
+    }
+  };
+
+  const loadDailyQuizAdmin = async () => {
+    setDailyQuizLoading(true);
+    setDailyQuizError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/daily/admin/quiz`, {
+        headers: getAuthHeaders()
+      });
+      setDailyQuizQuestions(response.data?.questions || []);
+      setDailyQuizDate(response.data?.date || '');
+    } catch (error) {
+      console.error('Error:', error);
+      setDailyQuizError('Impossible de charger les questions du jour.');
+      setDailyQuizQuestions([]);
+    } finally {
+      setDailyQuizLoading(false);
+    }
+  };
+
+  const moveDailyQuestion = (index, direction) => {
+    setDailyQuizQuestions((prev) => {
+      const next = [...prev];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) {
+        return prev;
+      }
+      const temp = next[index];
+      next[index] = next[target];
+      next[target] = temp;
+      return next;
+    });
+  };
+
+  const saveDailyQuizOrder = async () => {
+    if (!dailyQuizQuestions.length) return;
+    setDailyQuizSaving(true);
+    setDailyQuizError('');
+    try {
+      await axios.post(`${API_URL}/api/quiz/daily/admin/reorder`, {
+        order: dailyQuizQuestions.map((question) => question.id)
+      }, {
+        headers: getAuthHeaders()
+      });
+      await loadDailyQuizAdmin();
+    } catch (error) {
+      console.error('Error:', error);
+      const message = error?.response?.data?.error;
+      setDailyQuizError(message || 'Impossible d’enregistrer l’ordre.');
+    } finally {
+      setDailyQuizSaving(false);
     }
   };
 
@@ -614,6 +677,72 @@ const Admin = ({ isAdmin }) => {
             </select>
             <button type="submit" className="btn-submit">Ajouter la question</button>
           </form>
+
+          <div className="quiz-daily-section">
+            <div className="section-header">
+              <h3>Questions du jour</h3>
+              <div className="quiz-daily-actions">
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={loadDailyQuizAdmin}
+                  disabled={dailyQuizLoading}
+                >
+                  {dailyQuizLoading ? 'Chargement...' : 'Rafraichir'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={saveDailyQuizOrder}
+                  disabled={dailyQuizSaving || dailyQuizLoading || dailyQuizQuestions.length === 0}
+                >
+                  {dailyQuizSaving ? 'Sauvegarde...' : 'Enregistrer l’ordre'}
+                </button>
+              </div>
+            </div>
+            {dailyQuizDate && (
+              <p className="quiz-daily-meta">Date du quiz: {dailyQuizDate}</p>
+            )}
+            {dailyQuizError && (
+              <p className="quiz-daily-error">{dailyQuizError}</p>
+            )}
+            {dailyQuizQuestions.length === 0 && !dailyQuizLoading && !dailyQuizError && (
+              <p>Aucune question disponible.</p>
+            )}
+            {dailyQuizQuestions.length > 0 && (
+              <div className="quiz-daily-list">
+                {dailyQuizQuestions.map((question, index) => (
+                  <div key={question.id} className="quiz-daily-item">
+                    <div className="quiz-daily-order">
+                      <span>#{index + 1}</span>
+                      <div className="quiz-daily-buttons">
+                        <button
+                          type="button"
+                          className="btn-action btn-reset"
+                          onClick={() => moveDailyQuestion(index, -1)}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-action btn-reset"
+                          onClick={() => moveDailyQuestion(index, 1)}
+                          disabled={index === dailyQuizQuestions.length - 1}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                    <div className="quiz-daily-content">
+                      <p className="quiz-daily-question">{question.question}</p>
+                      <p className="quiz-daily-difficulty">Niveau: {question.difficulty}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

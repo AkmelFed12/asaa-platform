@@ -17,6 +17,7 @@ const Quiz = ({ user }) => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [openWindow, setOpenWindow] = useState({ from: '20:00', until: '23:59' });
+  const submittingRef = useRef(false);
   const resolvedUserId = user?.id || fallbackUserIdRef.current;
   const resolvedName = user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Participant';
 
@@ -94,6 +95,10 @@ const Quiz = ({ user }) => {
   };
 
   const handleSubmitAnswer = async (selectedIndex) => {
+    if (submittingRef.current || answered) {
+      return;
+    }
+    submittingRef.current = true;
     setAnswered(true);
     setSelectedOption(selectedIndex);
 
@@ -106,7 +111,7 @@ const Quiz = ({ user }) => {
       });
 
       if (response.data.isCorrect) {
-        setScore(score + 1);
+        setScore((prevScore) => prevScore + 1);
       }
 
       setTimeout(() => {
@@ -115,12 +120,14 @@ const Quiz = ({ user }) => {
           setTimeLeft(10);
           setAnswered(false);
           setSelectedOption(null);
+          submittingRef.current = false;
         } else {
           completeQuiz();
         }
       }, 1500);
     } catch (error) {
       console.error('Error:', error);
+      submittingRef.current = false;
       if (!handleQuizClosed(error)) {
         setErrorMessage('Erreur lors de l\'envoi de la reponse.');
         setStatus('error');
@@ -136,9 +143,11 @@ const Quiz = ({ user }) => {
 
       setUserResult(response.data);
       await loadLeaderboard();
+      submittingRef.current = false;
       setStatus('results');
     } catch (error) {
       console.error('Error:', error);
+      submittingRef.current = false;
       if (!handleQuizClosed(error)) {
         setErrorMessage('Erreur lors de la cloture du quiz.');
         setStatus('error');

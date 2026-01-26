@@ -38,6 +38,26 @@ async function initializeSchema() {
         quiz_date DATE NOT NULL
       )
     `);
+    await client.query(`
+      DELETE FROM quiz_question_usage
+      WHERE ctid IN (
+        SELECT ctid
+        FROM (
+          SELECT ctid,
+                 ROW_NUMBER() OVER (PARTITION BY question_id ORDER BY quiz_date ASC) AS rn
+          FROM quiz_question_usage
+        ) dedup
+        WHERE dedup.rn > 1
+      )
+    `);
+    await client.query(`
+      ALTER TABLE quiz_question_usage
+      DROP CONSTRAINT IF EXISTS quiz_question_usage_pkey
+    `);
+    await client.query(`
+      ALTER TABLE quiz_question_usage
+      ADD PRIMARY KEY (question_id)
+    `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_quizzes (
