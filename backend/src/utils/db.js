@@ -204,8 +204,13 @@ async function initializeSchema() {
         date TIMESTAMPTZ NOT NULL,
         location TEXT NOT NULL,
         image TEXT,
+        reminder_sent BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN NOT NULL DEFAULT FALSE
     `);
 
     await client.query(`
@@ -214,6 +219,30 @@ async function initializeSchema() {
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         pinned BOOLEAN NOT NULL DEFAULT FALSE,
+        is_published BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      ALTER TABLE news_announcements
+      ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    await client.query(`
+      ALTER TABLE news_announcements
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS news_history (
+        id BIGSERIAL PRIMARY KEY,
+        news_id BIGINT NOT NULL,
+        action TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        pinned BOOLEAN NOT NULL DEFAULT FALSE,
+        is_published BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
