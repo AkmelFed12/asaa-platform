@@ -77,6 +77,7 @@ const Footer = ({ onNavigate }) => {
             <a href="#linkedin" title="LinkedIn">in</a>
             <a href="#instagram" title="Instagram">📷</a>
           </div>
+          <p>Contacts: 0574724233 · 0705583082 · 0779382233 · 0151495971</p>
         </div>
       </div>
 

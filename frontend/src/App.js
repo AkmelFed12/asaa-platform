@@ -136,24 +136,21 @@ function App() {
         {currentPage === 'about' && (
           <section className="status-section">
             <h2>ASAA - Association des Serviteurs d'Allah Azawajal</h2>
-            <p><strong>Valeurs fondamentales:</strong> Respect - Tolerance - Pardon</p>
+            <p><strong>Valeurs fondamentales :</strong> Respect, Tolerance, Pardon.</p>
             <p>
-              L'Association des Serviteurs d'Allah Azawajal (ASAA) est une organisation a vocation religieuse, sociale
-              et educative, engagee dans la promotion des valeurs islamiques authentiques et du vivre-ensemble
-              harmonieux. Elle oeuvre pour le renforcement de la foi, de la fraternite et de la solidarite entre ses
-              membres et au sein de la communaute.
+              L'ASAA est une organisation religieuse, sociale et educative. Elle renforce la foi, la fraternite et la
+              solidarite au sein de la communaute, en promouvant un Islam authentique, responsable et apaise.
             </p>
             <p>
-              Guidee par les principes de respect, de tolerance et de pardon, l'ASAA place l'etre humain au coeur de son
-              action, en favorisant une pratique de l'Islam basee sur la connaissance, l'ethique et la responsabilite
-              sociale.
+              Notre approche place l'etre humain au coeur de l'action : apprendre, servir et grandir ensemble, avec
+              bienveillance et exigence.
             </p>
             <h3>Notre mission</h3>
             <ul>
-              <li>Renforcer la cohesion fraternelle entre les membres</li>
+              <li>Consolider la cohesion fraternelle entre les membres</li>
               <li>Encourager l'apprentissage et la transmission des enseignements islamiques</li>
-              <li>Sensibiliser la jeunesse aux valeurs morales et spirituelles de l'Islam</li>
-              <li>Contribuer activement au bien-etre social a travers des actions solidaires</li>
+              <li>Accompagner la jeunesse dans l'education morale et spirituelle</li>
+              <li>Agir pour le bien-etre social par des initiatives solidaires</li>
             </ul>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil
@@ -175,14 +172,12 @@ function App() {
           <section className="status-section">
             <h2>Politique de confidentialite</h2>
             <p>
-              La presente politique de confidentialite decrit la maniere dont l'Association des Serviteurs d'Allah
-              Azawajal (ASAA) collecte, utilise, protege et traite les donnees personnelles des utilisateurs du site.
+              Cette politique explique comment l'ASAA collecte, utilise et protege les donnees personnelles des
+              utilisateurs. En utilisant ce site, vous acceptez les pratiques decrites ci-dessous.
             </p>
-            <p>En utilisant ce site, vous acceptez les pratiques decrites dans la presente politique.</p>
             <h3>1. Responsable du traitement des donnees</h3>
             <p>
-              Le responsable du traitement des donnees personnelles est : ASAA - Association des Serviteurs d'Allah
-              Azawajal, organisation a caractere religieux, educatif et social.
+              ASAA - Association des Serviteurs d'Allah Azawajal, organisation a caractere religieux, educatif et social.
             </p>
             <h3>2. Donnees personnelles collectees</h3>
             <ul>
@@ -202,12 +197,12 @@ function App() {
             <h3>4. Confidentialite et partage</h3>
             <ul>
               <li>Les donnees ne sont ni vendues, ni louees, ni cedées a des tiers</li>
-              <li>Partage possible uniquement avec les responsables internes, pour les finalites ci-dessus</li>
+              <li>Partage interne uniquement, dans le cadre des finalites ci-dessus</li>
             </ul>
             <h3>5. Securite des donnees</h3>
             <p>
-              L'ASAA met en oeuvre des mesures techniques et organisationnelles pour proteger les donnees contre la
-              perte, l'acces non autorise, la divulgation ou la modification abusive.
+              L'ASAA applique des mesures techniques et organisationnelles pour proteger les donnees contre la perte,
+              l'acces non autorise, la divulgation ou la modification abusive.
             </p>
             <h3>6. Duree de conservation</h3>
             <p>
@@ -226,8 +221,8 @@ function App() {
             </p>
             <h3>8. Cookies</h3>
             <p>
-              Le site peut utiliser des cookies pour le fonctionnement et l'amelioration de l'experience utilisateur.
-              L'utilisateur peut configurer son navigateur pour refuser les cookies.
+              Le site peut utiliser des cookies pour son fonctionnement et l'amelioration de l'experience utilisateur.
+              Vous pouvez configurer votre navigateur pour les refuser.
             </p>
             <h3>9. Modification de la politique</h3>
             <p>
@@ -251,7 +246,15 @@ function App() {
         {currentPage === 'terms' && (
           <section className="status-section">
             <h2>Conditions d'utilisation</h2>
-            <p>L'utilisation de la plateforme implique le respect des regles et la bonne conduite en communaute.</p>
+            <p>
+              L'utilisation de la plateforme implique le respect des regles, des personnes et de l'ethique islamique.
+              Tout usage abusif pourra entrainer des restrictions d'acces.
+            </p>
+            <ul>
+              <li>Respecter les autres membres et leurs informations</li>
+              <li>Ne pas diffuser de contenus inappropries</li>
+              <li>Utiliser les services de maniere responsable</li>
+            </ul>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil
             </button>
@@ -261,6 +264,10 @@ function App() {
         {currentPage === 'activities' && (
           <section className="status-section">
             <h2>Nos activites - Annee 2026</h2>
+            <p>
+              Notre calendrier annuel combine des actions spirituelles, sociales et educatives pour renforcer la
+              cohesion et la fraternite.
+            </p>
             <h3>1. Activites ponctuelles</h3>
             <ul>
               <li><strong>Janvier:</strong> Sortie detente du Bureau - rencontre fraternelle pour renforcer la cohesion interne.</li>
