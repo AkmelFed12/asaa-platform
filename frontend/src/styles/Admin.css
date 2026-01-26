@@ -634,6 +634,39 @@
   font-weight: 600;
 }
 
+.admin-news-list {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-news-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 14px 16px;
+  border-left: 4px solid #667eea;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-news-item h4 {
+  margin: 0 0 6px 0;
+  color: #333;
+}
+
+.admin-news-item span {
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.admin-news-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .event-photo-upload {
   grid-column: 1 / -1;
 }

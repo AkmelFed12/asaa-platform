@@ -77,14 +77,7 @@ const Admin = ({ isAdmin }) => {
     totalQuizAttempts: 0,
     topScores: []
   });
-  const [newsItems, setNewsItems] = useState([
-    {
-      id: 'news-1',
-      title: 'Programme 2026 en cours de finalisation',
-      content: 'Le calendrier des activites est en cours de validation par le bureau.',
-      createdAt: new Date().toISOString()
-    }
-  ]);
+  const [newsItems, setNewsItems] = useState([]);
   const [newsForm, setNewsForm] = useState({
     title: '',
     content: ''
@@ -96,14 +89,7 @@ const Admin = ({ isAdmin }) => {
       loadData();
       loadMembers();
       loadEvents();
-      try {
-        const savedNews = localStorage.getItem('news');
-        if (savedNews) {
-          setNewsItems(JSON.parse(savedNews));
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
+      loadNews();
     }
   }, [isAdmin]);
 
@@ -116,12 +102,6 @@ const Admin = ({ isAdmin }) => {
       loadQuizLeaderboard();
     }
   }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
-
-  useEffect(() => {
-    if (adminView === 'news') {
-      syncNewsToStorage();
-    }
-  }, [adminView]);
 
   useEffect(() => {
     dailyQuizQuestionsRef.current = dailyQuizQuestions;
@@ -156,15 +136,6 @@ const Admin = ({ isAdmin }) => {
     setTimeout(() => {
       setUserToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 3500);
-  };
-
-  const syncNewsToStorage = (items) => {
-    try {
-      localStorage.setItem('news', JSON.stringify(items || newsItems));
-      pushUserToast('Actualites mises a jour.', 'success');
-    } catch (error) {
-      console.error('Error:', error);
-    }
   };
 
   const loadData = async () => {
@@ -642,24 +613,65 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const loadNews = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/news`);
+      setNewsItems(response.data?.data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   const handleNewsSubmit = (e) => {
     e.preventDefault();
     if (!newsForm.title.trim() || !newsForm.content.trim()) return;
-    const next = {
-      id: `news-${Date.now()}`,
-      title: newsForm.title.trim(),
-      content: newsForm.content.trim(),
-      createdAt: new Date().toISOString()
-    };
-    setNewsItems((prev) => [next, ...prev]);
-    setNewsForm({ title: '', content: '' });
-    syncNewsToStorage([next, ...newsItems]);
+    createNews();
   };
 
-  const handleDeleteNews = (id) => {
-    const next = newsItems.filter((item) => item.id !== id);
-    setNewsItems(next);
-    syncNewsToStorage(next);
+  const createNews = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/api/news`, {
+        title: newsForm.title.trim(),
+        content: newsForm.content.trim()
+      }, {
+        headers: getAuthHeaders()
+      });
+      setNewsItems((prev) => [response.data?.data, ...prev].filter(Boolean));
+      setNewsForm({ title: '', content: '' });
+      pushToast('Actualite publiee.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors de la publication.', 'error');
+    }
+  };
+
+  const handleDeleteNews = async (id) => {
+    try {
+      await axios.delete(`${API_URL}/api/news/${id}`, {
+        headers: getAuthHeaders()
+      });
+      setNewsItems((prev) => prev.filter((item) => item.id !== id));
+      pushToast('Actualite supprimee.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors de la suppression.', 'error');
+    }
+  };
+
+  const handlePinNews = async (id, pinned) => {
+    try {
+      const response = await axios.patch(`${API_URL}/api/news/${id}/pin`, {
+        pinned
+      }, {
+        headers: getAuthHeaders()
+      });
+      const updated = response.data?.data;
+      setNewsItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      pushToast(pinned ? 'Actualite epinglee.' : 'Actualite desepinglee.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors de la mise a jour.', 'error');
+    }
   };
 
   const downloadCsv = (filename, blob) => {
@@ -1887,15 +1899,24 @@ const Admin = ({ isAdmin }) => {
                 <div>
                   <h4>{item.title}</h4>
                   <p>{item.content}</p>
-                  <span>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</span>
+                  <span>{new Date(item.created_at || item.createdAt).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <button
-                  type="button"
-                  className="btn-action btn-delete"
-                  onClick={() => handleDeleteNews(item.id)}
-                >
-                  Supprimer
-                </button>
+                <div className="admin-news-actions">
+                  <button
+                    type="button"
+                    className="btn-action btn-reset"
+                    onClick={() => handlePinNews(item.id, !item.pinned)}
+                  >
+                    {item.pinned ? 'Desepingler' : 'Epingler'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-action btn-delete"
+                    onClick={() => handleDeleteNews(item.id)}
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             ))}
           </div>

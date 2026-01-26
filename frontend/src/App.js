@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Auth from './components/Auth';
 import Governance from './components/Governance';
@@ -52,30 +52,30 @@ function App() {
     }, 0);
   };
 
-  const newsItems = useMemo(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('news') || '[]');
-      if (stored.length > 0) return stored;
-    } catch (error) {
-      // ignore
-    }
-    return [
-      {
-        id: 'news-1',
-        title: 'Programme 2026 en cours de finalisation',
-        content: 'Le calendrier des activites est en cours de validation par le bureau.'
-      },
-      {
-        id: 'news-2',
-        title: 'Quiz Islamique 2026',
-        content: 'Les presélections seront communiquees prochainement.'
-      },
-      {
-        id: 'news-3',
-        title: 'Actions sociales',
-        content: 'Les visites solidaires sont planifiees pour la periode de septembre.'
+  const [newsItems, setNewsItems] = useState([]);
+
+  useEffect(() => {
+    const loadNews = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/news`);
+        const data = await response.json();
+        setNewsItems(data?.data || []);
+      } catch (error) {
+        setNewsItems([
+          {
+            id: 'news-1',
+            title: 'Programme 2026 en cours de finalisation',
+            content: 'Le calendrier des activites est en cours de validation par le bureau.'
+          },
+          {
+            id: 'news-2',
+            title: 'Quiz Islamique 2026',
+            content: 'Les presélections seront communiquees prochainement.'
+          }
+        ]);
       }
-    ];
+    };
+    loadNews();
   }, []);
 
   return (
@@ -349,7 +349,7 @@ function App() {
             <h2>Actualites & Annonces</h2>
             <div className="news-list">
               {newsItems.map((item) => (
-                <article key={item.id} className="news-item">
+                <article key={item.id} className={`news-item ${item.pinned ? 'pinned' : ''}`}>
                   <h3>{item.title}</h3>
                   <p>{item.content}</p>
                 </article>

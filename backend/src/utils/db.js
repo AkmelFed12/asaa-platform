@@ -208,6 +208,16 @@ async function initializeSchema() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS news_announcements (
+        id BIGSERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        pinned BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     const { rows: countRows } = await client.query(
       'SELECT COUNT(*)::int AS count FROM quiz_questions'
     );
