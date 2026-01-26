@@ -43,6 +43,8 @@ const Admin = ({ isAdmin }) => {
     location: '',
     image: ''
   });
+  const [eventPhotoPreview, setEventPhotoPreview] = useState('');
+  const [quizCleanupLoading, setQuizCleanupLoading] = useState(false);
   const [events, setEvents] = useState([]);
   const [photoSearchQuery, setPhotoSearchQuery] = useState('');
   const [photoSearchResults, setPhotoSearchResults] = useState([]);
@@ -390,6 +392,7 @@ const Admin = ({ isAdmin }) => {
         location: '',
         image: ''
       });
+      setEventPhotoPreview('');
       loadEvents();
     } catch (error) {
       console.error('Error:', error);
@@ -467,6 +470,33 @@ const Admin = ({ isAdmin }) => {
       downloadCsv('members.csv', response.data);
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const handleEventPhotoUpload = (data) => {
+    const photo = Array.isArray(data) ? data[0] : data;
+    if (!photo?.url) return;
+    setEventForm((prev) => ({ ...prev, image: photo.url }));
+    setEventPhotoPreview(photo.url);
+  };
+
+  const handleCleanupUsedQuestions = async () => {
+    setQuizCleanupLoading(true);
+    setDailyQuizError('');
+    try {
+      const response = await axios.post(`${API_URL}/api/quiz/daily/admin/cleanup`, {}, {
+        headers: getAuthHeaders()
+      });
+      const deleted = response.data?.deletedQuestions ?? 0;
+      alert(`Nettoyage termine. Questions supprimees: ${deleted}`);
+      await loadDailyQuizAdmin();
+      await loadQuizQuestions(true);
+    } catch (error) {
+      console.error('Error:', error);
+      const message = error?.response?.data?.error;
+      setDailyQuizError(message || 'Impossible de nettoyer les questions.');
+    } finally {
+      setQuizCleanupLoading(false);
     }
   };
 
@@ -772,6 +802,14 @@ const Admin = ({ isAdmin }) => {
                 >
                   {dailyQuizSaving ? 'Sauvegarde...' : 'Enregistrer l’ordre'}
                 </button>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={handleCleanupUsedQuestions}
+                  disabled={quizCleanupLoading}
+                >
+                  {quizCleanupLoading ? 'Nettoyage...' : 'Nettoyer les questions utilisees'}
+                </button>
               </div>
             </div>
             {dailyQuizDate && (
@@ -1065,12 +1103,14 @@ const Admin = ({ isAdmin }) => {
               onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
               required
             />
-            <input
-              type="url"
-              placeholder="URL de l'image"
-              value={eventForm.image}
-              onChange={(e) => setEventForm({ ...eventForm, image: e.target.value })}
-            />
+            <div className="event-photo-upload">
+              <PhotoUpload onUploadSuccess={handleEventPhotoUpload} />
+              {eventPhotoPreview && (
+                <div className="event-photo-preview">
+                  <img src={normalizePhotoUrl(eventPhotoPreview)} alt="Aperçu" />
+                </div>
+              )}
+            </div>
             <button type="submit" className="btn-submit">Créer l'événement</button>
           </form>
 

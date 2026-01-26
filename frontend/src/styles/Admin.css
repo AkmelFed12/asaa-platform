@@ -465,6 +465,22 @@
   border-radius: 6px;
 }
 
+.event-photo-upload {
+  grid-column: 1 / -1;
+}
+
+.event-photo-preview {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.event-photo-preview img {
+  max-width: 220px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .admin-header h2 {

@@ -327,6 +327,53 @@ router.post('/daily/admin/reorder', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
+  const quizDate = getToday();
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const { rows: quizRows } = await client.query(
+      'SELECT id FROM daily_quizzes WHERE quiz_date = $1',
+      [quizDate]
+    );
+    const quizId = quizRows[0]?.id;
+
+    if (quizId) {
+      const { rows: attemptRows } = await client.query(
+        'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
+        [quizId]
+      );
+      if (attemptRows[0].count > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Quiz already started' });
+      }
+    }
+
+    if (quizId) {
+      await client.query('DELETE FROM daily_quizzes WHERE id = $1', [quizId]);
+    }
+
+    const { rows: deletedRows } = await client.query(
+      `WITH deleted AS (
+         DELETE FROM quiz_questions
+         WHERE id IN (SELECT question_id FROM quiz_question_usage)
+         RETURNING id
+       )
+       SELECT COUNT(*)::int AS count FROM deleted`
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, deletedQuestions: deletedRows[0]?.count || 0 });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/daily/start', async (req, res, next) => {
   if (!ensureQuizOpen(res)) {
     return;
