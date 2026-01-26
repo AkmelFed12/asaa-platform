@@ -109,162 +109,168 @@ function App() {
       <main className="App-main">
         {currentPage === 'home' && (
           <>
-            <section className="welcome-section">
+            <section className="welcome-section home-hero">
               <h2>Bienvenue sur ASAA</h2>
               <p>Association des Serviteurs d'Allah Azawajal</p>
-              <p>Plateforme de gestion, coordination et apprentissage islamique</p>
             </section>
 
-            <section className="features-section">
-              <h2>Fonctionnalités Disponibles</h2>
-              <div className="features-grid">
-                <div className="feature-card">
-                  <h3>📋 Gouvernance</h3>
-                  <p>Consultez la structure organisationnelle et les responsables</p>
-                </div>
-                <div className="feature-card">
-                  <h3>📚 Quiz Islamique</h3>
-                  <p>Testez vos connaissances avec 20 questions chronométrées</p>
-                </div>
-                {user.role === 'admin' && (
-                  <div className="feature-card">
-                    <h3>🔧 Administration</h3>
-                    <p>Gérez les positions et les paramètres du système</p>
-                  </div>
-                )}
+            <section className="home-grid">
+              <div className="home-card">
+                <h3>👤 Membres</h3>
+                <p>Accedez a votre profil et aux informations des membres.</p>
+                <button type="button" className="home-action-btn" onClick={() => setCurrentPage('profile')}>
+                  Voir les membres
+                </button>
+              </div>
+              <div className="home-card">
+                <h3>📋 Gouvernance</h3>
+                <p>Consultez la structure organisationnelle et les responsables.</p>
+                <button type="button" className="home-action-btn" onClick={() => setCurrentPage('governance')}>
+                  Voir la gouvernance
+                </button>
               </div>
             </section>
-
-            <section className="status-section" id="about">
-              <h2>ASAA - Association des Serviteurs d'Allah Azawajal</h2>
-              <p><strong>Valeurs fondamentales:</strong> Respect - Tolerance - Pardon</p>
-              <p>
-                L'Association des Serviteurs d'Allah Azawajal (ASAA) est une organisation a vocation religieuse, sociale
-                et educative, engagee dans la promotion des valeurs islamiques authentiques et du vivre-ensemble
-                harmonieux. Elle oeuvre pour le renforcement de la foi, de la fraternite et de la solidarite entre ses
-                membres et au sein de la communaute.
-              </p>
-              <p>
-                Guidee par les principes de respect, de tolerance et de pardon, l'ASAA place l'etre humain au coeur de
-                son action, en favorisant une pratique de l'Islam basee sur la connaissance, l'ethique et la
-                responsabilite sociale.
-              </p>
-              <h3>Notre mission</h3>
-              <ul>
-                <li>Renforcer la cohesion fraternelle entre les membres</li>
-                <li>Encourager l'apprentissage et la transmission des enseignements islamiques</li>
-                <li>Sensibiliser la jeunesse aux valeurs morales et spirituelles de l'Islam</li>
-                <li>Contribuer activement au bien-etre social a travers des actions solidaires</li>
-              </ul>
-            </section>
-
-            <section className="status-section" id="contact">
-              <h2>Contact</h2>
-              <p>Pour toute demande, contactez l'administration via votre responsable local.</p>
-            </section>
-
-            <section className="status-section" id="privacy">
-              <h2>Politique de confidentialite</h2>
-              <p>
-                La presente politique de confidentialite decrit la maniere dont l'Association des Serviteurs d'Allah
-                Azawajal (ASAA) collecte, utilise, protege et traite les donnees personnelles des utilisateurs du site.
-              </p>
-              <p>En utilisant ce site, vous acceptez les pratiques decrites dans la presente politique.</p>
-              <h3>1. Responsable du traitement des donnees</h3>
-              <p>
-                Le responsable du traitement des donnees personnelles est : ASAA - Association des Serviteurs d'Allah
-                Azawajal, organisation a caractere religieux, educatif et social.
-              </p>
-              <h3>2. Donnees personnelles collectees</h3>
-              <ul>
-                <li>Nom et prenom</li>
-                <li>Adresse e-mail</li>
-                <li>Numero de telephone</li>
-                <li>Informations transmises via les formulaires de contact ou d'inscription</li>
-              </ul>
-              <p>Aucune donnee personnelle n'est collectee a votre insu.</p>
-              <h3>3. Finalites de la collecte</h3>
-              <ul>
-                <li>Repondre aux demandes envoyees via le site</li>
-                <li>Gerer les inscriptions aux activites et evenements</li>
-                <li>Informer les membres des actions et communications de l'ASAA</li>
-                <li>Ameliorer le fonctionnement et le contenu du site</li>
-              </ul>
-              <h3>4. Confidentialite et partage</h3>
-              <ul>
-                <li>Les donnees ne sont ni vendues, ni louees, ni cedées a des tiers</li>
-                <li>Partage possible uniquement avec les responsables internes, pour les finalites ci-dessus</li>
-              </ul>
-              <h3>5. Securite des donnees</h3>
-              <p>
-                L'ASAA met en oeuvre des mesures techniques et organisationnelles pour proteger les donnees contre la
-                perte, l'acces non autorise, la divulgation ou la modification abusive.
-              </p>
-              <h3>6. Duree de conservation</h3>
-              <p>
-                Les donnees personnelles sont conservees uniquement pendant la duree necessaire aux objectifs pour
-                lesquels elles ont ete collectees, sauf obligation legale contraire.
-              </p>
-              <h3>7. Droits des utilisateurs</h3>
-              <ul>
-                <li>Droit d'acces a ses donnees</li>
-                <li>Droit de rectification des donnees inexactes</li>
-                <li>Droit de suppression</li>
-                <li>Droit d'opposition a l'utilisation</li>
-              </ul>
-              <p>
-                Toute demande relative a ces droits peut etre adressee a l'ASAA via les moyens de contact du site.
-              </p>
-              <h3>8. Cookies</h3>
-              <p>
-                Le site peut utiliser des cookies pour le fonctionnement et l'amelioration de l'experience utilisateur.
-                L'utilisateur peut configurer son navigateur pour refuser les cookies.
-              </p>
-              <h3>9. Modification de la politique</h3>
-              <p>
-                L'ASAA se reserve le droit de modifier la presente politique a tout moment. Les modifications prennent
-                effet des leur publication sur le site.
-              </p>
-              <h3>10. Contact</h3>
-              <p>Pour toute question, contactez l'ASAA :</p>
-              <ul>
-                <li>0574724233</li>
-                <li>0705583082</li>
-                <li>0779382233</li>
-                <li>0151495971</li>
-              </ul>
-            </section>
-
-            <section className="status-section" id="terms">
-              <h2>Conditions d'utilisation</h2>
-              <p>L'utilisation de la plateforme implique le respect des regles et la bonne conduite en communaute.</p>
-            </section>
-
-            <section className="status-section" id="activities">
-              <h2>Nos activites - Annee 2026</h2>
-              <h3>1. Activites ponctuelles</h3>
-              <ul>
-                <li><strong>Janvier:</strong> Sortie detente du Bureau - rencontre fraternelle pour renforcer la cohesion interne.</li>
-                <li><strong>Fevrier:</strong> Rupture collective - moment de partage reunissant l'ensemble des membres.</li>
-                <li><strong>Mars:</strong> Match de gala et lancement du Quiz Islamique 2026 - fraternite et ouverture des preselections.</li>
-                <li><strong>Juillet:</strong> Cloture des preselections - selection des candidats pour la grande finale.</li>
-                <li><strong>Aout:</strong> Grande finale du Quiz Islamique - evenement phare de l'annee.</li>
-                <li><strong>Septembre:</strong> Actions sociales et recueillement - Ziara et visites solidaires aux malades.</li>
-                <li><strong>Decembre:</strong> Conference de fin d'annee - sensibilisation sur les derives des festivites.</li>
-              </ul>
-              <h3>2. Activites permanentes</h3>
-              <ul>
-                <li><strong>Le Grin Religieux:</strong> rencontre hebdomadaire chaque dimanche, apprentissage et echange.</li>
-                <li><strong>Rencontres tournantes:</strong> reunions chez les membres pour renforcer les liens familiaux.</li>
-                <li><strong>Echanges et formations:</strong> causeries, debats et enseignements islamiques reguliers.</li>
-              </ul>
-              <h3>Notre engagement</h3>
-              <p>
-                A travers ses actions, l'ASAA s'engage a etre un cadre de reference pour l'education spirituelle, la
-                solidarite et l'epanouissement moral de ses membres, dans le respect des valeurs islamiques et humaines.
-              </p>
-            </section>
           </>
+        )}
+
+        {currentPage === 'about' && (
+          <section className="status-section">
+            <h2>ASAA - Association des Serviteurs d'Allah Azawajal</h2>
+            <p><strong>Valeurs fondamentales:</strong> Respect - Tolerance - Pardon</p>
+            <p>
+              L'Association des Serviteurs d'Allah Azawajal (ASAA) est une organisation a vocation religieuse, sociale
+              et educative, engagee dans la promotion des valeurs islamiques authentiques et du vivre-ensemble
+              harmonieux. Elle oeuvre pour le renforcement de la foi, de la fraternite et de la solidarite entre ses
+              membres et au sein de la communaute.
+            </p>
+            <p>
+              Guidee par les principes de respect, de tolerance et de pardon, l'ASAA place l'etre humain au coeur de son
+              action, en favorisant une pratique de l'Islam basee sur la connaissance, l'ethique et la responsabilite
+              sociale.
+            </p>
+            <h3>Notre mission</h3>
+            <ul>
+              <li>Renforcer la cohesion fraternelle entre les membres</li>
+              <li>Encourager l'apprentissage et la transmission des enseignements islamiques</li>
+              <li>Sensibiliser la jeunesse aux valeurs morales et spirituelles de l'Islam</li>
+              <li>Contribuer activement au bien-etre social a travers des actions solidaires</li>
+            </ul>
+          </section>
+        )}
+
+        {currentPage === 'contact' && (
+          <section className="status-section">
+            <h2>Contact</h2>
+            <p>Pour toute demande, contactez l'administration via votre responsable local.</p>
+          </section>
+        )}
+
+        {currentPage === 'privacy' && (
+          <section className="status-section">
+            <h2>Politique de confidentialite</h2>
+            <p>
+              La presente politique de confidentialite decrit la maniere dont l'Association des Serviteurs d'Allah
+              Azawajal (ASAA) collecte, utilise, protege et traite les donnees personnelles des utilisateurs du site.
+            </p>
+            <p>En utilisant ce site, vous acceptez les pratiques decrites dans la presente politique.</p>
+            <h3>1. Responsable du traitement des donnees</h3>
+            <p>
+              Le responsable du traitement des donnees personnelles est : ASAA - Association des Serviteurs d'Allah
+              Azawajal, organisation a caractere religieux, educatif et social.
+            </p>
+            <h3>2. Donnees personnelles collectees</h3>
+            <ul>
+              <li>Nom et prenom</li>
+              <li>Adresse e-mail</li>
+              <li>Numero de telephone</li>
+              <li>Informations transmises via les formulaires de contact ou d'inscription</li>
+            </ul>
+            <p>Aucune donnee personnelle n'est collectee a votre insu.</p>
+            <h3>3. Finalites de la collecte</h3>
+            <ul>
+              <li>Repondre aux demandes envoyees via le site</li>
+              <li>Gerer les inscriptions aux activites et evenements</li>
+              <li>Informer les membres des actions et communications de l'ASAA</li>
+              <li>Ameliorer le fonctionnement et le contenu du site</li>
+            </ul>
+            <h3>4. Confidentialite et partage</h3>
+            <ul>
+              <li>Les donnees ne sont ni vendues, ni louees, ni cedées a des tiers</li>
+              <li>Partage possible uniquement avec les responsables internes, pour les finalites ci-dessus</li>
+            </ul>
+            <h3>5. Securite des donnees</h3>
+            <p>
+              L'ASAA met en oeuvre des mesures techniques et organisationnelles pour proteger les donnees contre la
+              perte, l'acces non autorise, la divulgation ou la modification abusive.
+            </p>
+            <h3>6. Duree de conservation</h3>
+            <p>
+              Les donnees personnelles sont conservees uniquement pendant la duree necessaire aux objectifs pour
+              lesquels elles ont ete collectees, sauf obligation legale contraire.
+            </p>
+            <h3>7. Droits des utilisateurs</h3>
+            <ul>
+              <li>Droit d'acces a ses donnees</li>
+              <li>Droit de rectification des donnees inexactes</li>
+              <li>Droit de suppression</li>
+              <li>Droit d'opposition a l'utilisation</li>
+            </ul>
+            <p>
+              Toute demande relative a ces droits peut etre adressee a l'ASAA via les moyens de contact du site.
+            </p>
+            <h3>8. Cookies</h3>
+            <p>
+              Le site peut utiliser des cookies pour le fonctionnement et l'amelioration de l'experience utilisateur.
+              L'utilisateur peut configurer son navigateur pour refuser les cookies.
+            </p>
+            <h3>9. Modification de la politique</h3>
+            <p>
+              L'ASAA se reserve le droit de modifier la presente politique a tout moment. Les modifications prennent
+              effet des leur publication sur le site.
+            </p>
+            <h3>10. Contact</h3>
+            <p>Pour toute question, contactez l'ASAA :</p>
+            <ul>
+              <li>0574724233</li>
+              <li>0705583082</li>
+              <li>0779382233</li>
+              <li>0151495971</li>
+            </ul>
+          </section>
+        )}
+
+        {currentPage === 'terms' && (
+          <section className="status-section">
+            <h2>Conditions d'utilisation</h2>
+            <p>L'utilisation de la plateforme implique le respect des regles et la bonne conduite en communaute.</p>
+          </section>
+        )}
+
+        {currentPage === 'activities' && (
+          <section className="status-section">
+            <h2>Nos activites - Annee 2026</h2>
+            <h3>1. Activites ponctuelles</h3>
+            <ul>
+              <li><strong>Janvier:</strong> Sortie detente du Bureau - rencontre fraternelle pour renforcer la cohesion interne.</li>
+              <li><strong>Fevrier:</strong> Rupture collective - moment de partage reunissant l'ensemble des membres.</li>
+              <li><strong>Mars:</strong> Match de gala et lancement du Quiz Islamique 2026 - fraternite et ouverture des preselections.</li>
+              <li><strong>Juillet:</strong> Cloture des preselections - selection des candidats pour la grande finale.</li>
+              <li><strong>Aout:</strong> Grande finale du Quiz Islamique - evenement phare de l'annee.</li>
+              <li><strong>Septembre:</strong> Actions sociales et recueillement - Ziara et visites solidaires aux malades.</li>
+              <li><strong>Decembre:</strong> Conference de fin d'annee - sensibilisation sur les derives des festivites.</li>
+            </ul>
+            <h3>2. Activites permanentes</h3>
+            <ul>
+              <li><strong>Le Grin Religieux:</strong> rencontre hebdomadaire chaque dimanche, apprentissage et echange.</li>
+              <li><strong>Rencontres tournantes:</strong> reunions chez les membres pour renforcer les liens familiaux.</li>
+              <li><strong>Echanges et formations:</strong> causeries, debats et enseignements islamiques reguliers.</li>
+            </ul>
+            <h3>Notre engagement</h3>
+            <p>
+              A travers ses actions, l'ASAA s'engage a etre un cadre de reference pour l'education spirituelle, la
+              solidarite et l'epanouissement moral de ses membres, dans le respect des valeurs islamiques et humaines.
+            </p>
+          </section>
         )}
 
         {currentPage === 'governance' && (

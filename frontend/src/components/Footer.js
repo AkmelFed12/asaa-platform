@@ -42,27 +42,27 @@ const Footer = ({ onNavigate }) => {
           <h4>À propos</h4>
           <ul>
             <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'about')}>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('about')}>
                 À propos de nous
               </button>
             </li>
             <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'activities')}>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('activities')}>
                 Nos activites
               </button>
             </li>
             <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'contact')}>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('contact')}>
                 Contact
               </button>
             </li>
             <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'privacy')}>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('privacy')}>
                 Politique de confidentialité
               </button>
             </li>
             <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'terms')}>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('terms')}>
                 Conditions d'utilisation
               </button>
             </li>

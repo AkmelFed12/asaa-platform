@@ -34,7 +34,11 @@ const Admin = ({ isAdmin }) => {
   const [quizQuestionsError, setQuizQuestionsError] = useState('');
   const [quizQuestionsSearch, setQuizQuestionsSearch] = useState('');
   const [quizQuestionsUnusedOnly, setQuizQuestionsUnusedOnly] = useState(true);
+  const [quizQuestionsDifficulty, setQuizQuestionsDifficulty] = useState('');
   const [dailyReplaceSelections, setDailyReplaceSelections] = useState({});
+  const [quizHistory, setQuizHistory] = useState([]);
+  const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
+  const [quizHistoryError, setQuizHistoryError] = useState('');
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -70,8 +74,9 @@ const Admin = ({ isAdmin }) => {
     if (isAdmin && adminView === 'quiz') {
       loadDailyQuizAdmin();
       loadQuizQuestions(true);
+      loadQuizHistory();
     }
-  }, [isAdmin, adminView, quizQuestionsUnusedOnly]);
+  }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
@@ -278,7 +283,8 @@ const Admin = ({ isAdmin }) => {
           limit: 50,
           offset: nextOffset,
           search: quizQuestionsSearch || undefined,
-          unused: quizQuestionsUnusedOnly ? true : undefined
+          unused: quizQuestionsUnusedOnly ? true : undefined,
+          difficulty: quizQuestionsDifficulty || undefined
         }
       });
       const incoming = response.data?.questions || [];
@@ -300,13 +306,32 @@ const Admin = ({ isAdmin }) => {
         params: {
           limit: 200,
           offset: 0,
-          unused: true
+          unused: true,
+          difficulty: quizQuestionsDifficulty || undefined
         }
       });
       return response.data?.questions || [];
     } catch (error) {
       console.error('Error:', error);
       return [];
+    }
+  };
+
+  const loadQuizHistory = async () => {
+    setQuizHistoryLoading(true);
+    setQuizHistoryError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/daily/admin/history`, {
+        headers: getAuthHeaders(),
+        params: { days: 7 }
+      });
+      setQuizHistory(response.data?.history || []);
+    } catch (error) {
+      console.error('Error:', error);
+      setQuizHistoryError('Impossible de charger l’historique.');
+      setQuizHistory([]);
+    } finally {
+      setQuizHistoryLoading(false);
     }
   };
 
@@ -573,6 +598,23 @@ const Admin = ({ isAdmin }) => {
       setDailyQuizError(message || 'Impossible de nettoyer les questions.');
     } finally {
       setQuizCleanupLoading(false);
+    }
+  };
+
+  const exportQuestionsCsv = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/questions/export/csv`, {
+        headers: getAuthHeaders(),
+        responseType: 'blob',
+        params: {
+          search: quizQuestionsSearch || undefined,
+          unused: quizQuestionsUnusedOnly ? true : undefined,
+          difficulty: quizQuestionsDifficulty || undefined
+        }
+      });
+      downloadCsv('quiz_questions.csv', response.data);
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 
@@ -984,6 +1026,15 @@ const Admin = ({ isAdmin }) => {
                   value={quizQuestionsSearch}
                   onChange={(e) => setQuizQuestionsSearch(e.target.value)}
                 />
+                <select
+                  value={quizQuestionsDifficulty}
+                  onChange={(e) => setQuizQuestionsDifficulty(e.target.value)}
+                >
+                  <option value="">Toutes difficultes</option>
+                  <option value="easy">Facile</option>
+                  <option value="medium">Moyen</option>
+                  <option value="hard">Difficile</option>
+                </select>
                 <label className="quiz-edit-filter">
                   <input
                     type="checkbox"
@@ -999,6 +1050,13 @@ const Admin = ({ isAdmin }) => {
                   disabled={quizQuestionsLoading}
                 >
                   Rechercher
+                </button>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={exportQuestionsCsv}
+                >
+                  Export CSV
                 </button>
               </div>
             </div>
@@ -1073,6 +1131,44 @@ const Admin = ({ isAdmin }) => {
               >
                 {quizQuestionsLoading ? 'Chargement...' : 'Charger plus'}
               </button>
+            )}
+          </div>
+
+          <div className="quiz-history-section">
+            <div className="section-header">
+              <h3>Historique du quiz (7 jours)</h3>
+              <button
+                type="button"
+                className="btn-create-user"
+                onClick={loadQuizHistory}
+                disabled={quizHistoryLoading}
+              >
+                {quizHistoryLoading ? 'Chargement...' : 'Rafraichir'}
+              </button>
+            </div>
+            {quizHistoryError && (
+              <p className="quiz-daily-error">{quizHistoryError}</p>
+            )}
+            {quizHistory.length === 0 && !quizHistoryLoading && !quizHistoryError && (
+              <p>Aucun historique disponible.</p>
+            )}
+            {quizHistory.length > 0 && (
+              <div className="quiz-history-list">
+                {quizHistory.map((entry) => (
+                  <details key={entry.quizId} className="quiz-history-item">
+                    <summary>
+                      {entry.date} ({entry.questions.length} questions)
+                    </summary>
+                    <ol>
+                      {entry.questions.map((question) => (
+                        <li key={question.id}>
+                          {question.question} ({question.difficulty})
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ))}
+              </div>
             )}
           </div>
         </div>

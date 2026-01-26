@@ -327,6 +327,57 @@ router.post('/daily/admin/reorder', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.get('/daily/admin/history', requireAdmin, async (req, res, next) => {
+  const days = Math.min(Number(req.query.days) || 7, 30);
+  try {
+    const { rows: quizRows } = await pool.query(
+      `SELECT id, quiz_date
+       FROM daily_quizzes
+       ORDER BY quiz_date DESC
+       LIMIT $1`,
+      [days]
+    );
+
+    if (quizRows.length === 0) {
+      return res.json({ success: true, history: [] });
+    }
+
+    const quizIds = quizRows.map((row) => row.id);
+    const { rows: questionRows } = await pool.query(
+      `SELECT dq.quiz_id, dq.position, q.id, q.question_text, q.options, q.difficulty
+       FROM daily_quiz_questions dq
+       JOIN quiz_questions q ON q.id = dq.question_id
+       WHERE dq.quiz_id = ANY($1::bigint[])
+       ORDER BY dq.quiz_id, dq.position`,
+      [quizIds]
+    );
+
+    const questionMap = new Map();
+    for (const row of questionRows) {
+      if (!questionMap.has(row.quiz_id)) {
+        questionMap.set(row.quiz_id, []);
+      }
+      questionMap.get(row.quiz_id).push({
+        id: row.id,
+        position: row.position,
+        question: row.question_text,
+        options: row.options,
+        difficulty: row.difficulty
+      });
+    }
+
+    const history = quizRows.map((row) => ({
+      quizId: row.id,
+      date: row.quiz_date,
+      questions: questionMap.get(row.id) || []
+    }));
+
+    res.json({ success: true, history });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
   const quizDate = getToday();
   const client = await pool.connect();
@@ -783,6 +834,7 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const unusedOnly = req.query.unused === 'true';
+  const difficulty = typeof req.query.difficulty === 'string' ? req.query.difficulty.trim() : '';
 
   try {
     let query = `
@@ -793,9 +845,13 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
     if (unusedOnly) {
       query += ` WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)`;
     }
+    if (difficulty) {
+      params.push(difficulty);
+      query += `${unusedOnly ? ' AND' : ' WHERE'} difficulty = $${params.length}`;
+    }
     if (search) {
       params.push(`%${search}%`);
-      query += `${unusedOnly ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
+      query += `${unusedOnly || difficulty ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
     }
     params.push(limit, offset);
     query += `
@@ -820,6 +876,56 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
       offset,
       hasMore: rows.length === limit
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/questions/export/csv', requireAdmin, async (req, res, next) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const unusedOnly = req.query.unused === 'true';
+  const difficulty = typeof req.query.difficulty === 'string' ? req.query.difficulty.trim() : '';
+
+  try {
+    let query = `
+      SELECT id, question_text, options, correct_index, difficulty, created_at, created_by
+      FROM quiz_questions
+    `;
+    const params = [];
+    if (unusedOnly) {
+      query += ` WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)`;
+    }
+    if (difficulty) {
+      params.push(difficulty);
+      query += `${unusedOnly ? ' AND' : ' WHERE'} difficulty = $${params.length}`;
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      query += `${unusedOnly || difficulty ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const { rows } = await pool.query(query, params);
+    const header = 'id,question,options,correct_index,difficulty,created_at,created_by\n';
+    const escapeCsv = (value) => {
+      const text = String(value ?? '');
+      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    };
+    const lines = rows.map((row) => ([
+      row.id,
+      escapeCsv(row.question_text),
+      escapeCsv(JSON.stringify(row.options)),
+      row.correct_index,
+      row.difficulty,
+      row.created_at.toISOString(),
+      row.created_by
+    ].join(',')));
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.send(header + lines.join('\n'));
   } catch (error) {
     next(error);
   }
