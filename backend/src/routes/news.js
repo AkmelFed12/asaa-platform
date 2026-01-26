@@ -35,6 +35,30 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
+router.put('/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { title, content } = req.body;
+  if (!title || !content) {
+    return res.status(400).json({ error: 'Title and content required' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE news_announcements
+       SET title = $1, content = $2
+       WHERE id = $3
+       RETURNING id, title, content, pinned, created_at`,
+      [title, content, id]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'News not found' });
+    }
+    res.json({ data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 router.patch('/:id/pin', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { pinned } = req.body;

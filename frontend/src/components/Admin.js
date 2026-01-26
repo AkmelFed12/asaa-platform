@@ -82,6 +82,7 @@ const Admin = ({ isAdmin }) => {
     title: '',
     content: ''
   });
+  const [newsEditingId, setNewsEditingId] = useState(null);
   const [userToasts, setUserToasts] = useState([]);
 
   useEffect(() => {
@@ -625,7 +626,11 @@ const Admin = ({ isAdmin }) => {
   const handleNewsSubmit = (e) => {
     e.preventDefault();
     if (!newsForm.title.trim() || !newsForm.content.trim()) return;
-    createNews();
+    if (newsEditingId) {
+      updateNews(newsEditingId);
+    } else {
+      createNews();
+    }
   };
 
   const createNews = async () => {
@@ -642,6 +647,25 @@ const Admin = ({ isAdmin }) => {
     } catch (error) {
       console.error('Error:', error);
       pushToast('Erreur lors de la publication.', 'error');
+    }
+  };
+
+  const updateNews = async (id) => {
+    try {
+      const response = await axios.put(`${API_URL}/api/news/${id}`, {
+        title: newsForm.title.trim(),
+        content: newsForm.content.trim()
+      }, {
+        headers: getAuthHeaders()
+      });
+      const updated = response.data?.data;
+      setNewsItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      setNewsForm({ title: '', content: '' });
+      setNewsEditingId(null);
+      pushToast('Actualite mise a jour.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors de la mise a jour.', 'error');
     }
   };
 
@@ -1889,7 +1913,21 @@ const Admin = ({ isAdmin }) => {
               onChange={(e) => setNewsForm((prev) => ({ ...prev, content: e.target.value }))}
               required
             />
-            <button type="submit" className="btn-submit">Publier</button>
+            <button type="submit" className="btn-submit">
+              {newsEditingId ? 'Mettre a jour' : 'Publier'}
+            </button>
+            {newsEditingId && (
+              <button
+                type="button"
+                className="btn-action btn-reset"
+                onClick={() => {
+                  setNewsEditingId(null);
+                  setNewsForm({ title: '', content: '' });
+                }}
+              >
+                Annuler
+              </button>
+            )}
           </form>
 
           <div className="admin-news-list">
@@ -1902,6 +1940,16 @@ const Admin = ({ isAdmin }) => {
                   <span>{new Date(item.created_at || item.createdAt).toLocaleDateString('fr-FR')}</span>
                 </div>
                 <div className="admin-news-actions">
+                  <button
+                    type="button"
+                    className="btn-action btn-reset"
+                    onClick={() => {
+                      setNewsEditingId(item.id);
+                      setNewsForm({ title: item.title, content: item.content });
+                    }}
+                  >
+                    Modifier
+                  </button>
                   <button
                     type="button"
                     className="btn-action btn-reset"
