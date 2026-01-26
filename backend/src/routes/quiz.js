@@ -782,6 +782,7 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const unusedOnly = req.query.unused === 'true';
 
   try {
     let query = `
@@ -789,9 +790,12 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
       FROM quiz_questions
     `;
     const params = [];
+    if (unusedOnly) {
+      query += ` WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)`;
+    }
     if (search) {
       params.push(`%${search}%`);
-      query += ` WHERE question_text ILIKE $${params.length}`;
+      query += `${unusedOnly ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
     }
     params.push(limit, offset);
     query += `

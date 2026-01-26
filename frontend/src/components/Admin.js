@@ -291,6 +291,23 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const loadUnusedQuizQuestions = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/questions`, {
+        headers: getAuthHeaders(),
+        params: {
+          limit: 200,
+          offset: 0,
+          unused: true
+        }
+      });
+      return response.data?.questions || [];
+    } catch (error) {
+      console.error('Error:', error);
+      return [];
+    }
+  };
+
   const handleQuizQuestionChange = (id, field, value) => {
     setQuizQuestions((prev) =>
       prev.map((question) => {
@@ -521,12 +538,13 @@ const Admin = ({ isAdmin }) => {
   };
 
   const replaceDailyQuestionRandom = async (position) => {
-    if (!quizQuestions.length) {
-      setDailyQuizError('Chargez les questions disponibles avant de remplacer.');
+    const available = await loadUnusedQuizQuestions();
+    if (!available.length) {
+      setDailyQuizError('Aucune question disponible pour le remplacement.');
       return;
     }
     const dailyIds = new Set(dailyQuizQuestions.map((item) => item.id));
-    const candidates = quizQuestions.filter((item) => !dailyIds.has(item.id));
+    const candidates = available.filter((item) => !dailyIds.has(item.id));
     if (!candidates.length) {
       setDailyQuizError('Aucune question disponible pour le remplacement.');
       return;
@@ -915,8 +933,13 @@ const Admin = ({ isAdmin }) => {
                               [question.position]: Number(e.target.value)
                             }))
                           }
+                          onFocus={async () => {
+                            const unused = await loadUnusedQuizQuestions();
+                            setQuizQuestions(unused);
+                            setQuizQuestionsHasMore(false);
+                          }}
                         >
-                          <option value="">Choisir une autre question</option>
+                          <option value="">Choisir une autre question (non utilisee)</option>
                           {quizQuestions
                             .filter((item) => item.id !== question.id)
                             .map((item) => (
