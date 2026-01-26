@@ -425,6 +425,79 @@ router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.post('/daily/admin/generate', requireAdmin, async (req, res, next) => {
+  const { difficulty, keyword } = req.body;
+  const normalizedDifficulty = typeof difficulty === 'string' ? difficulty.trim() : '';
+  const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : '';
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: attemptRows } = await client.query(
+      'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
+      [quizId]
+    );
+
+    if (attemptRows[0].count > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Quiz already started' });
+    }
+
+    await client.query('DELETE FROM daily_quiz_questions WHERE quiz_id = $1', [quizId]);
+
+    const params = [];
+    let filterQuery = `
+      SELECT id, question_text, options, correct_index, difficulty
+      FROM quiz_questions
+      WHERE is_active = TRUE
+        AND id NOT IN (SELECT question_id FROM quiz_question_usage)
+    `;
+
+    if (normalizedDifficulty) {
+      params.push(normalizedDifficulty);
+      filterQuery += ` AND difficulty = $${params.length}`;
+    }
+    if (normalizedKeyword) {
+      params.push(`%${normalizedKeyword}%`);
+      filterQuery += ` AND question_text ILIKE $${params.length}`;
+    }
+
+    params.push(DAILY_QUESTION_COUNT);
+    filterQuery += ` ORDER BY RANDOM() LIMIT $${params.length}`;
+
+    const { rows: questions } = await client.query(filterQuery, params);
+    if (questions.length < DAILY_QUESTION_COUNT) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Not enough questions for this filter' });
+    }
+
+    const quizDate = getToday();
+    for (let i = 0; i < questions.length; i += 1) {
+      await client.query(
+        `INSERT INTO daily_quiz_questions (quiz_id, question_id, position)
+         VALUES ($1, $2, $3)`,
+        [quizId, questions[i].id, i]
+      );
+      await client.query(
+        `INSERT INTO quiz_question_usage (question_id, quiz_date)
+         VALUES ($1, $2)
+         ON CONFLICT (question_id) DO NOTHING`,
+        [questions[i].id, quizDate]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, count: questions.length });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/daily/admin/replace', requireAdmin, async (req, res, next) => {
   const { position, newQuestionId } = req.body;
   const numericPosition = Number(position);

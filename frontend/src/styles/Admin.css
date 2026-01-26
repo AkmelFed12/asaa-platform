@@ -415,6 +415,27 @@
   flex-wrap: wrap;
 }
 
+.quiz-daily-special {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 15px;
+}
+
+.quiz-daily-special-fields {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quiz-daily-special-fields input,
+.quiz-daily-special-fields select {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  min-width: 220px;
+}
+
 .quiz-edit-section {
   margin-top: 30px;
 }
@@ -531,6 +552,22 @@
 .quiz-history-item ol {
   margin: 10px 0 0 18px;
   color: #555;
+}
+
+.quiz-leaderboard-section {
+  margin-top: 25px;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
 }
 
 .quiz-stats-section {

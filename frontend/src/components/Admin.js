@@ -41,7 +41,15 @@ const Admin = ({ isAdmin }) => {
   const [quizHistoryError, setQuizHistoryError] = useState('');
   const [quizStats, setQuizStats] = useState(null);
   const [quizStatsError, setQuizStatsError] = useState('');
+  const [quizLeaderboard, setQuizLeaderboard] = useState([]);
+  const [quizLeaderboardError, setQuizLeaderboardError] = useState('');
+  const [replaceHardOnly, setReplaceHardOnly] = useState(false);
+  const [specialDifficulty, setSpecialDifficulty] = useState('');
+  const [specialKeyword, setSpecialKeyword] = useState('');
+  const [specialGenerating, setSpecialGenerating] = useState(false);
   const quizDailyRef = useRef(null);
+  const dailyQuizQuestionsRef = useRef([]);
+  const autoSaveTimerRef = useRef(null);
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -79,8 +87,13 @@ const Admin = ({ isAdmin }) => {
       loadQuizQuestions(true);
       loadQuizHistory();
       loadQuizStats();
+      loadQuizLeaderboard();
     }
   }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
+
+  useEffect(() => {
+    dailyQuizQuestionsRef.current = dailyQuizQuestions;
+  }, [dailyQuizQuestions]);
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
@@ -253,15 +266,17 @@ const Admin = ({ isAdmin }) => {
       next[target] = temp;
       return next;
     });
+    scheduleAutoSave();
   };
 
-  const saveDailyQuizOrder = async () => {
-    if (!dailyQuizQuestions.length) return;
+  const saveDailyQuizOrder = async (questionsOverride) => {
+    const questions = questionsOverride || dailyQuizQuestionsRef.current;
+    if (!questions.length) return;
     setDailyQuizSaving(true);
     setDailyQuizError('');
     try {
       await axios.post(`${API_URL}/api/quiz/daily/admin/reorder`, {
-        order: dailyQuizQuestions.map((question) => question.id)
+        order: questions.map((question) => question.id)
       }, {
         headers: getAuthHeaders()
       });
@@ -273,6 +288,15 @@ const Admin = ({ isAdmin }) => {
     } finally {
       setDailyQuizSaving(false);
     }
+  };
+
+  const scheduleAutoSave = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveDailyQuizOrder(dailyQuizQuestionsRef.current);
+    }, 600);
   };
 
   const loadQuizQuestions = async (reset = false) => {
@@ -311,7 +335,7 @@ const Admin = ({ isAdmin }) => {
           limit: 200,
           offset: 0,
           unused: true,
-          difficulty: quizQuestionsDifficulty || undefined
+          difficulty: replaceHardOnly ? 'hard' : quizQuestionsDifficulty || undefined
         }
       });
       return response.data?.questions || [];
@@ -350,6 +374,18 @@ const Admin = ({ isAdmin }) => {
       console.error('Error:', error);
       setQuizStatsError('Impossible de charger les statistiques.');
       setQuizStats(null);
+    }
+  };
+
+  const loadQuizLeaderboard = async () => {
+    setQuizLeaderboardError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/daily/leaderboard`);
+      setQuizLeaderboard(response.data?.leaderboard || []);
+    } catch (error) {
+      console.error('Error:', error);
+      setQuizLeaderboardError('Impossible de charger le classement.');
+      setQuizLeaderboard([]);
     }
   };
 
@@ -597,6 +633,27 @@ const Admin = ({ isAdmin }) => {
     const random = candidates[Math.floor(Math.random() * candidates.length)];
     setDailyReplaceSelections((prev) => ({ ...prev, [position]: random.id }));
     await replaceDailyQuestion(position);
+  };
+
+  const generateSpecialQuiz = async () => {
+    setSpecialGenerating(true);
+    setDailyQuizError('');
+    try {
+      await axios.post(`${API_URL}/api/quiz/daily/admin/generate`, {
+        difficulty: specialDifficulty || undefined,
+        keyword: specialKeyword || undefined
+      }, {
+        headers: getAuthHeaders()
+      });
+      await loadDailyQuizAdmin();
+      await loadQuizStats();
+    } catch (error) {
+      console.error('Error:', error);
+      const message = error?.response?.data?.error;
+      setDailyQuizError(message || 'Impossible de generer le quiz.');
+    } finally {
+      setSpecialGenerating(false);
+    }
   };
 
   const handleCleanupUsedQuestions = async () => {
@@ -955,6 +1012,33 @@ const Admin = ({ isAdmin }) => {
                 </button>
               </div>
             </div>
+            <div className="quiz-daily-special">
+              <div className="quiz-daily-special-fields">
+                <select
+                  value={specialDifficulty}
+                  onChange={(e) => setSpecialDifficulty(e.target.value)}
+                >
+                  <option value="">Toutes difficultes</option>
+                  <option value="easy">Facile</option>
+                  <option value="medium">Moyen</option>
+                  <option value="hard">Difficile</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Mot-cle (ex: prophete, compagnon)"
+                  value={specialKeyword}
+                  onChange={(e) => setSpecialKeyword(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn-create-user"
+                onClick={generateSpecialQuiz}
+                disabled={specialGenerating}
+              >
+                {specialGenerating ? 'Generation...' : 'Generer quiz special'}
+              </button>
+            </div>
             {dailyQuizDate && (
               <p className="quiz-daily-meta">Date du quiz: {dailyQuizDate}</p>
             )}
@@ -1008,7 +1092,9 @@ const Admin = ({ isAdmin }) => {
                             setQuizQuestionsHasMore(false);
                           }}
                         >
-                          <option value="">Choisir une autre question (non utilisee)</option>
+                          <option value="">
+                            Choisir une autre question (non utilisee{replaceHardOnly ? ', difficile' : ''})
+                          </option>
                           {quizQuestions
                             .filter((item) => item.id !== question.id)
                             .map((item) => (
@@ -1017,6 +1103,14 @@ const Admin = ({ isAdmin }) => {
                               </option>
                             ))}
                         </select>
+                        <label className="quiz-edit-filter">
+                          <input
+                            type="checkbox"
+                            checked={replaceHardOnly}
+                            onChange={(e) => setReplaceHardOnly(e.target.checked)}
+                          />
+                          Difficiles uniquement
+                        </label>
                         <div className="quiz-daily-replace-actions">
                           <button
                             type="button"
@@ -1121,6 +1215,46 @@ const Admin = ({ isAdmin }) => {
                 <p className="quiz-low-warning">
                   Attention: il reste peu de questions non utilisees. Pensez a en ajouter.
                 </p>
+              )}
+            </div>
+            <div className="quiz-leaderboard-section">
+              <div className="section-header">
+                <h3>Top 10 scores (semaine)</h3>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={loadQuizLeaderboard}
+                >
+                  Rafraichir
+                </button>
+              </div>
+              {quizLeaderboardError && <p className="quiz-daily-error">{quizLeaderboardError}</p>}
+              {quizLeaderboard.length === 0 && !quizLeaderboardError && (
+                <p>Aucun score disponible.</p>
+              )}
+              {quizLeaderboard.length > 0 && (
+                <table className="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>Rang</th>
+                      <th>Nom</th>
+                      <th>Score</th>
+                      <th>%</th>
+                      <th>Niveau</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quizLeaderboard.slice(0, 10).map((entry) => (
+                      <tr key={entry.rank}>
+                        <td>{entry.rank}</td>
+                        <td>{entry.name}</td>
+                        <td>{entry.score}/20</td>
+                        <td>{entry.percentage}%</td>
+                        <td>{entry.level}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
             {quizQuestionsError && (
