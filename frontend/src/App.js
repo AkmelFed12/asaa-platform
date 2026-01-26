@@ -162,6 +162,17 @@ function App() {
           <section className="status-section">
             <h2>Contact</h2>
             <p>Pour toute demande, contactez l'administration via votre responsable local.</p>
+            <div className="contact-card">
+              <h3>Contact rapide</h3>
+              <p>Téléphone :</p>
+              <ul>
+                <li>0574724233</li>
+                <li>0705583082</li>
+                <li>0779382233</li>
+                <li>0151495971</li>
+              </ul>
+              <p>Disponibilité : 08h00 - 18h00</p>
+            </div>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil
             </button>

@@ -179,6 +179,23 @@
   background: #184c23;
 }
 
+.contact-card {
+  margin: 20px 0;
+  padding: 18px;
+  border-radius: 10px;
+  background: #f0f9f6;
+  border-left: 4px solid #1d5c2a;
+}
+
+.contact-card h3 {
+  margin: 0 0 10px 0;
+  color: #1d5c2a;
+}
+
+.contact-card ul {
+  margin: 8px 0 12px 18px;
+}
+
 .status-section,
 .governance-section,
 .delegations-section,
