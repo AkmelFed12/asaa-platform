@@ -155,6 +155,9 @@ function App() {
               <li>Sensibiliser la jeunesse aux valeurs morales et spirituelles de l'Islam</li>
               <li>Contribuer activement au bien-etre social a travers des actions solidaires</li>
             </ul>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
           </section>
         )}
 
@@ -162,6 +165,9 @@ function App() {
           <section className="status-section">
             <h2>Contact</h2>
             <p>Pour toute demande, contactez l'administration via votre responsable local.</p>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
           </section>
         )}
 
@@ -236,6 +242,9 @@ function App() {
               <li>0779382233</li>
               <li>0151495971</li>
             </ul>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
           </section>
         )}
 
@@ -243,6 +252,9 @@ function App() {
           <section className="status-section">
             <h2>Conditions d'utilisation</h2>
             <p>L'utilisation de la plateforme implique le respect des regles et la bonne conduite en communaute.</p>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
           </section>
         )}
 
@@ -270,6 +282,9 @@ function App() {
               A travers ses actions, l'ASAA s'engage a etre un cadre de reference pour l'education spirituelle, la
               solidarite et l'epanouissement moral de ses membres, dans le respect des valeurs islamiques et humaines.
             </p>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
           </section>
         )}
 
