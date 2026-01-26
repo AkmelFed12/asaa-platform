@@ -77,12 +77,33 @@ const Admin = ({ isAdmin }) => {
     totalQuizAttempts: 0,
     topScores: []
   });
+  const [newsItems, setNewsItems] = useState([
+    {
+      id: 'news-1',
+      title: 'Programme 2026 en cours de finalisation',
+      content: 'Le calendrier des activites est en cours de validation par le bureau.',
+      createdAt: new Date().toISOString()
+    }
+  ]);
+  const [newsForm, setNewsForm] = useState({
+    title: '',
+    content: ''
+  });
+  const [userToasts, setUserToasts] = useState([]);
 
   useEffect(() => {
     if (isAdmin) {
       loadData();
       loadMembers();
       loadEvents();
+      try {
+        const savedNews = localStorage.getItem('news');
+        if (savedNews) {
+          setNewsItems(JSON.parse(savedNews));
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
     }
   }, [isAdmin]);
 
@@ -95,6 +116,12 @@ const Admin = ({ isAdmin }) => {
       loadQuizLeaderboard();
     }
   }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
+
+  useEffect(() => {
+    if (adminView === 'news') {
+      syncNewsToStorage();
+    }
+  }, [adminView]);
 
   useEffect(() => {
     dailyQuizQuestionsRef.current = dailyQuizQuestions;
@@ -121,6 +148,23 @@ const Admin = ({ isAdmin }) => {
       return `${API_URL}${url}`;
     }
     return url;
+  };
+
+  const pushUserToast = (message, type = 'info') => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setUserToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setUserToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3500);
+  };
+
+  const syncNewsToStorage = (items) => {
+    try {
+      localStorage.setItem('news', JSON.stringify(items || newsItems));
+      pushUserToast('Actualites mises a jour.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   const loadData = async () => {
@@ -598,6 +642,26 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const handleNewsSubmit = (e) => {
+    e.preventDefault();
+    if (!newsForm.title.trim() || !newsForm.content.trim()) return;
+    const next = {
+      id: `news-${Date.now()}`,
+      title: newsForm.title.trim(),
+      content: newsForm.content.trim(),
+      createdAt: new Date().toISOString()
+    };
+    setNewsItems((prev) => [next, ...prev]);
+    setNewsForm({ title: '', content: '' });
+    syncNewsToStorage([next, ...newsItems]);
+  };
+
+  const handleDeleteNews = (id) => {
+    const next = newsItems.filter((item) => item.id !== id);
+    setNewsItems(next);
+    syncNewsToStorage(next);
+  };
+
   const downloadCsv = (filename, blob) => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -802,6 +866,15 @@ const Admin = ({ isAdmin }) => {
           ))}
         </div>
       )}
+      {userToasts.length > 0 && (
+        <div className="toast-container user-toast">
+          {userToasts.map((toast) => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="admin-header">
         <h2>🔧 Panneau d'Administration</h2>
         <p>Gestion des utilisateurs et des ressources de la plateforme</p>
@@ -870,6 +943,12 @@ const Admin = ({ isAdmin }) => {
           onClick={() => setAdminView('photos')}
         >
           🖼️ Photos
+        </button>
+        <button
+          className={`admin-tab ${adminView === 'news' ? 'active' : ''}`}
+          onClick={() => setAdminView('news')}
+        >
+          📰 Actualités
         </button>
       </div>
 
@@ -1778,6 +1857,48 @@ const Admin = ({ isAdmin }) => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {adminView === 'news' && (
+        <div className="admin-section">
+          <h3>📰 Gérer les actualités</h3>
+          <form className="user-form" onSubmit={handleNewsSubmit}>
+            <input
+              type="text"
+              placeholder="Titre de l'actualité"
+              value={newsForm.title}
+              onChange={(e) => setNewsForm((prev) => ({ ...prev, title: e.target.value }))}
+              required
+            />
+            <textarea
+              placeholder="Contenu"
+              value={newsForm.content}
+              onChange={(e) => setNewsForm((prev) => ({ ...prev, content: e.target.value }))}
+              required
+            />
+            <button type="submit" className="btn-submit">Publier</button>
+          </form>
+
+          <div className="admin-news-list">
+            {newsItems.length === 0 && <p>Aucune actualité.</p>}
+            {newsItems.map((item) => (
+              <div key={item.id} className="admin-news-item">
+                <div>
+                  <h4>{item.title}</h4>
+                  <p>{item.content}</p>
+                  <span>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-action btn-delete"
+                  onClick={() => handleDeleteNews(item.id)}
+                >
+                  Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import Auth from './components/Auth';
 import Governance from './components/Governance';
@@ -51,6 +51,32 @@ function App() {
       }
     }, 0);
   };
+
+  const newsItems = useMemo(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('news') || '[]');
+      if (stored.length > 0) return stored;
+    } catch (error) {
+      // ignore
+    }
+    return [
+      {
+        id: 'news-1',
+        title: 'Programme 2026 en cours de finalisation',
+        content: 'Le calendrier des activites est en cours de validation par le bureau.'
+      },
+      {
+        id: 'news-2',
+        title: 'Quiz Islamique 2026',
+        content: 'Les presélections seront communiquees prochainement.'
+      },
+      {
+        id: 'news-3',
+        title: 'Actions sociales',
+        content: 'Les visites solidaires sont planifiees pour la periode de septembre.'
+      }
+    ];
+  }, []);
 
   return (
     <div className="App">
@@ -322,18 +348,12 @@ function App() {
           <section className="status-section">
             <h2>Actualites & Annonces</h2>
             <div className="news-list">
-              <article className="news-item">
-                <h3>Programme 2026 en cours de finalisation</h3>
-                <p>Le calendrier des activites est en cours de validation par le bureau.</p>
-              </article>
-              <article className="news-item">
-                <h3>Quiz Islamique 2026</h3>
-                <p>Les presélections seront communiquees prochainement.</p>
-              </article>
-              <article className="news-item">
-                <h3>Actions sociales</h3>
-                <p>Les visites solidaires sont planifiees pour la periode de septembre.</p>
-              </article>
+              {newsItems.map((item) => (
+                <article key={item.id} className="news-item">
+                  <h3>{item.title}</h3>
+                  <p>{item.content}</p>
+                </article>
+              ))}
             </div>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil
