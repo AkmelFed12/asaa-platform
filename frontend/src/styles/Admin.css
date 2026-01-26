@@ -395,6 +395,76 @@
   font-size: 0.9em;
 }
 
+.quiz-edit-section {
+  margin-top: 30px;
+}
+
+.quiz-edit-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quiz-edit-actions input {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  min-width: 240px;
+}
+
+.quiz-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.quiz-edit-item {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 18px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.quiz-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.quiz-edit-row label {
+  font-weight: 600;
+  color: #333;
+}
+
+.quiz-edit-row input {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+}
+
+.quiz-edit-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.quiz-edit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 15px;
+}
+
+.quiz-edit-controls select {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .admin-header h2 {

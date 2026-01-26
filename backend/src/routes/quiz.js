@@ -56,6 +56,16 @@ async function getOrCreateDailyQuiz() {
   try {
     await client.query('BEGIN');
 
+    await client.query(
+      `DELETE FROM quiz_questions
+       WHERE id IN (
+         SELECT question_id
+         FROM quiz_question_usage
+         WHERE quiz_date < $1
+       )`,
+      [quizDate]
+    );
+
     const insertQuiz = await client.query(
       `INSERT INTO daily_quizzes (quiz_date)
        VALUES ($1)
@@ -616,6 +626,97 @@ router.post('/questions', requireAdmin, async (req, res, next) => {
     res.status(201).json({
       success: true,
       question: rows[0]
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/questions', requireAdmin, async (req, res, next) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+  try {
+    let query = `
+      SELECT id, question_text, options, correct_index, difficulty, created_at, created_by
+      FROM quiz_questions
+    `;
+    const params = [];
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` WHERE question_text ILIKE $${params.length}`;
+    }
+    params.push(limit, offset);
+    query += `
+      ORDER BY created_at DESC
+      LIMIT $${params.length - 1}
+      OFFSET $${params.length}
+    `;
+
+    const { rows } = await pool.query(query, params);
+    res.json({
+      success: true,
+      questions: rows.map((row) => ({
+        id: row.id,
+        question: row.question_text,
+        options: row.options,
+        correctIndex: row.correct_index,
+        difficulty: row.difficulty,
+        createdAt: row.created_at,
+        createdBy: row.created_by
+      })),
+      limit,
+      offset,
+      hasMore: rows.length === limit
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/questions/:id', requireAdmin, async (req, res, next) => {
+  const questionId = Number(req.params.id);
+  const { question, options, correctIndex, difficulty } = req.body;
+
+  if (!questionId || Number.isNaN(questionId)) {
+    return res.status(400).json({ error: 'Invalid question id' });
+  }
+  if (!question || !Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ error: 'Invalid question data' });
+  }
+  if (correctIndex === undefined || Number.isNaN(Number(correctIndex))) {
+    return res.status(400).json({ error: 'Invalid correct index' });
+  }
+  if (!difficulty) {
+    return res.status(400).json({ error: 'Invalid difficulty' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE quiz_questions
+       SET question_text = $1,
+           options = $2::jsonb,
+           correct_index = $3,
+           difficulty = $4
+       WHERE id = $5
+       RETURNING id, question_text, options, correct_index, difficulty`,
+      [question, JSON.stringify(options), Number(correctIndex), difficulty, questionId]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    res.json({
+      success: true,
+      question: {
+        id: rows[0].id,
+        question: rows[0].question_text,
+        options: rows[0].options,
+        correctIndex: rows[0].correct_index,
+        difficulty: rows[0].difficulty
+      }
     });
   } catch (error) {
     next(error);

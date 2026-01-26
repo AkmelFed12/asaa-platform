@@ -27,6 +27,12 @@ const Admin = ({ isAdmin }) => {
   const [dailyQuizLoading, setDailyQuizLoading] = useState(false);
   const [dailyQuizError, setDailyQuizError] = useState('');
   const [dailyQuizSaving, setDailyQuizSaving] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [quizQuestionsOffset, setQuizQuestionsOffset] = useState(0);
+  const [quizQuestionsHasMore, setQuizQuestionsHasMore] = useState(true);
+  const [quizQuestionsLoading, setQuizQuestionsLoading] = useState(false);
+  const [quizQuestionsError, setQuizQuestionsError] = useState('');
+  const [quizQuestionsSearch, setQuizQuestionsSearch] = useState('');
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -58,6 +64,7 @@ const Admin = ({ isAdmin }) => {
   useEffect(() => {
     if (isAdmin && adminView === 'quiz') {
       loadDailyQuizAdmin();
+      loadQuizQuestions(true);
     }
   }, [isAdmin, adminView]);
 
@@ -195,6 +202,7 @@ const Admin = ({ isAdmin }) => {
         correctIndex: 0,
         difficulty: 'easy'
       });
+      loadQuizQuestions(true);
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de la création de la question');
@@ -250,6 +258,72 @@ const Admin = ({ isAdmin }) => {
       setDailyQuizError(message || 'Impossible d’enregistrer l’ordre.');
     } finally {
       setDailyQuizSaving(false);
+    }
+  };
+
+  const loadQuizQuestions = async (reset = false) => {
+    if (quizQuestionsLoading) return;
+    setQuizQuestionsLoading(true);
+    setQuizQuestionsError('');
+    try {
+      const nextOffset = reset ? 0 : quizQuestionsOffset;
+      const response = await axios.get(`${API_URL}/api/quiz/questions`, {
+        headers: getAuthHeaders(),
+        params: {
+          limit: 50,
+          offset: nextOffset,
+          search: quizQuestionsSearch || undefined
+        }
+      });
+      const incoming = response.data?.questions || [];
+      setQuizQuestions((prev) => (reset ? incoming : [...prev, ...incoming]));
+      setQuizQuestionsOffset(nextOffset + incoming.length);
+      setQuizQuestionsHasMore(Boolean(response.data?.hasMore));
+    } catch (error) {
+      console.error('Error:', error);
+      setQuizQuestionsError('Impossible de charger les questions.');
+    } finally {
+      setQuizQuestionsLoading(false);
+    }
+  };
+
+  const handleQuizQuestionChange = (id, field, value) => {
+    setQuizQuestions((prev) =>
+      prev.map((question) => {
+        if (question.id !== id) return question;
+        if (field === 'question') {
+          return { ...question, question: value };
+        }
+        if (field === 'difficulty') {
+          return { ...question, difficulty: value };
+        }
+        if (field === 'correctIndex') {
+          return { ...question, correctIndex: Number(value) };
+        }
+        if (field.startsWith('option_')) {
+          const index = Number(field.split('_')[1]);
+          const nextOptions = [...question.options];
+          nextOptions[index] = value;
+          return { ...question, options: nextOptions };
+        }
+        return question;
+      })
+    );
+  };
+
+  const saveQuizQuestion = async (question) => {
+    try {
+      await axios.put(`${API_URL}/api/quiz/questions/${question.id}`, {
+        question: question.question,
+        options: question.options,
+        correctIndex: question.correctIndex,
+        difficulty: question.difficulty
+      }, {
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Erreur lors de la mise à jour.');
     }
   };
 
@@ -741,6 +815,100 @@ const Admin = ({ isAdmin }) => {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          <div className="quiz-edit-section">
+            <div className="section-header">
+              <h3>Modifier les questions</h3>
+              <div className="quiz-edit-actions">
+                <input
+                  type="text"
+                  placeholder="Rechercher une question"
+                  value={quizQuestionsSearch}
+                  onChange={(e) => setQuizQuestionsSearch(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={() => loadQuizQuestions(true)}
+                  disabled={quizQuestionsLoading}
+                >
+                  Rechercher
+                </button>
+              </div>
+            </div>
+            {quizQuestionsError && (
+              <p className="quiz-daily-error">{quizQuestionsError}</p>
+            )}
+            {quizQuestions.length === 0 && !quizQuestionsLoading && !quizQuestionsError && (
+              <p>Aucune question trouvée.</p>
+            )}
+            {quizQuestions.length > 0 && (
+              <div className="quiz-edit-list">
+                {quizQuestions.map((question) => (
+                  <div key={question.id} className="quiz-edit-item">
+                    <div className="quiz-edit-row">
+                      <label>Question</label>
+                      <input
+                        type="text"
+                        value={question.question}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'question', e.target.value)}
+                      />
+                    </div>
+                    <div className="quiz-edit-options">
+                      {question.options.map((option, index) => (
+                        <div key={index} className="quiz-edit-row">
+                          <label>Option {index + 1}</label>
+                          <input
+                            type="text"
+                            value={option}
+                            onChange={(e) =>
+                              handleQuizQuestionChange(question.id, `option_${index}`, e.target.value)
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="quiz-edit-controls">
+                      <select
+                        value={question.correctIndex}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'correctIndex', e.target.value)}
+                      >
+                        <option value={0}>Bonne: Option 1</option>
+                        <option value={1}>Bonne: Option 2</option>
+                        <option value={2}>Bonne: Option 3</option>
+                        <option value={3}>Bonne: Option 4</option>
+                      </select>
+                      <select
+                        value={question.difficulty}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'difficulty', e.target.value)}
+                      >
+                        <option value="easy">Facile</option>
+                        <option value="medium">Moyen</option>
+                        <option value="hard">Difficile</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="btn-submit"
+                        onClick={() => saveQuizQuestion(question)}
+                      >
+                        Enregistrer
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {quizQuestionsHasMore && (
+              <button
+                type="button"
+                className="btn-create-user"
+                onClick={() => loadQuizQuestions(false)}
+                disabled={quizQuestionsLoading}
+              >
+                {quizQuestionsLoading ? 'Chargement...' : 'Charger plus'}
+              </button>
             )}
           </div>
         </div>
