@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import PhotoUpload from './PhotoUpload';
 import '../styles/Events.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -15,8 +16,10 @@ const Events = ({ isAdmin }) => {
   const [events, setEvents] = useState([]);
   const [futureEvents, setFutureEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
-  const [view, setView] = useState('future'); // future, past, admin
+  const [view, setView] = useState('future'); // future, past, calendar, admin
   const [showForm, setShowForm] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [eventPhotoPreview, setEventPhotoPreview] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -60,6 +63,7 @@ const Events = ({ isAdmin }) => {
         location: '',
         image: ''
       });
+      setEventPhotoPreview('');
       setShowForm(false);
       loadEvents();
     } catch (error) {
@@ -82,6 +86,98 @@ const Events = ({ isAdmin }) => {
       }
     }
   };
+
+  const handleEventPhotoUpload = (data) => {
+    const photo = Array.isArray(data) ? data[0] : data;
+    if (!photo?.url) return;
+    setFormData((prev) => ({ ...prev, image: photo.url }));
+    setEventPhotoPreview(photo.url);
+  };
+
+  const escapeHtml = (value) => (
+    String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+  );
+
+  const exportPdf = () => {
+    const list = view === 'past'
+      ? pastEvents
+      : view === 'future'
+        ? futureEvents
+        : [...futureEvents, ...pastEvents];
+    const rows = list.map((event) => (
+      `<tr>
+        <td>${escapeHtml(event.title)}</td>
+        <td>${escapeHtml(new Date(event.date).toLocaleDateString('fr-FR'))}</td>
+        <td>${escapeHtml(event.location)}</td>
+      </tr>`
+    )).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Evenements ASAA</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { color: #2d7a3a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background: #f0f9f6; }
+          </style>
+        </head>
+        <body>
+          <h1>Evenements ASAA</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Titre</th>
+                <th>Date</th>
+                <th>Lieu</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="3">Aucun evenement</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const getMonthLabel = (date) => (
+    date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  );
+
+  const getCalendarDays = () => {
+    const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
+    const startDay = start.getDay() || 7;
+    const days = [];
+
+    for (let i = 1; i < startDay; i += 1) {
+      days.push(null);
+    }
+    for (let d = 1; d <= end.getDate(); d += 1) {
+      days.push(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d));
+    }
+    return days;
+  };
+
+  const allEvents = [...futureEvents, ...pastEvents];
+  const eventsByDate = allEvents.reduce((acc, event) => {
+    const key = new Date(event.date).toISOString().split('T')[0];
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(event);
+    return acc;
+  }, {});
 
   const EventCard = ({ event, isPast }) => (
     <div className="event-card">
@@ -122,6 +218,7 @@ const Events = ({ isAdmin }) => {
       <div className="events-header">
         <h2>📅 Événements ASAA</h2>
         <p>Les événements professionnels de la formation</p>
+        <button className="btn-export" onClick={exportPdf}>Exporter PDF</button>
       </div>
 
       <div className="events-tabs">
@@ -136,6 +233,12 @@ const Events = ({ isAdmin }) => {
           onClick={() => setView('past')}
         >
           Passés ({pastEvents.length})
+        </button>
+        <button
+          className={`tab ${view === 'calendar' ? 'active' : ''}`}
+          onClick={() => setView('calendar')}
+        >
+          Calendrier
         </button>
         {isAdmin && (
           <button 
@@ -208,12 +311,12 @@ const Events = ({ isAdmin }) => {
                 onChange={(e) => setFormData({...formData, location: e.target.value})}
                 required
               />
-              <input
-                type="url"
-                placeholder="URL de l'image"
-                value={formData.image}
-                onChange={(e) => setFormData({...formData, image: e.target.value})}
-              />
+              <PhotoUpload onUploadSuccess={handleEventPhotoUpload} />
+              {eventPhotoPreview && (
+                <div className="event-upload-preview">
+                  <img src={normalizeImageUrl(eventPhotoPreview)} alt="Aperçu" />
+                </div>
+              )}
               <button type="submit" className="btn-submit">Créer l'événement</button>
             </form>
           )}
@@ -232,6 +335,46 @@ const Events = ({ isAdmin }) => {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {view === 'calendar' && (
+        <div className="events-calendar">
+          <div className="calendar-header">
+            <button
+              type="button"
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+            >
+              ←
+            </button>
+            <h3>{getMonthLabel(calendarMonth)}</h3>
+            <button
+              type="button"
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+            >
+              →
+            </button>
+          </div>
+          <div className="calendar-grid">
+            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => (
+              <div key={day} className="calendar-day-name">{day}</div>
+            ))}
+            {getCalendarDays().map((day, idx) => {
+              if (!day) return <div key={`empty-${idx}`} className="calendar-cell empty" />;
+              const key = day.toISOString().split('T')[0];
+              const dayEvents = eventsByDate[key] || [];
+              return (
+                <div key={key} className="calendar-cell">
+                  <div className="calendar-date">{day.getDate()}</div>
+                  {dayEvents.map((event) => (
+                    <div key={event.id} className="calendar-event">
+                      {event.title}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -84,6 +84,12 @@ function App() {
         >
           📅 Événements
         </button>
+        <button
+          className={`nav-btn ${currentPage === 'news' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('news')}
+        >
+          📰 Actualités
+        </button>
         <button 
           className={`nav-btn ${currentPage === 'governance' ? 'active' : ''}`}
           onClick={() => setCurrentPage('governance')}
@@ -306,6 +312,29 @@ function App() {
               <li><strong>Comment ajouter un evenement ?</strong> Les admins peuvent creer ou modifier des evenements.</li>
               <li><strong>Qui contacter en cas de probleme ?</strong> Utilisez la page Contact ou les numeros affiches.</li>
             </ul>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
+          </section>
+        )}
+
+        {currentPage === 'news' && (
+          <section className="status-section">
+            <h2>Actualites & Annonces</h2>
+            <div className="news-list">
+              <article className="news-item">
+                <h3>Programme 2026 en cours de finalisation</h3>
+                <p>Le calendrier des activites est en cours de validation par le bureau.</p>
+              </article>
+              <article className="news-item">
+                <h3>Quiz Islamique 2026</h3>
+                <p>Les presélections seront communiquees prochainement.</p>
+              </article>
+              <article className="news-item">
+                <h3>Actions sociales</h3>
+                <p>Les visites solidaires sont planifiees pour la periode de septembre.</p>
+              </article>
+            </div>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil
             </button>

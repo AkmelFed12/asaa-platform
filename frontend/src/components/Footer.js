@@ -31,6 +31,11 @@ const Footer = ({ onNavigate }) => {
               </button>
             </li>
             <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('news')}>
+                Actualités
+              </button>
+            </li>
+            <li>
               <button type="button" className="footer-link" onClick={() => onNavigate?.('governance')}>
                 Gouvernance
               </button>
