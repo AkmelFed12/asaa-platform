@@ -192,8 +192,13 @@ async function initializeSchema() {
         member_number TEXT NOT NULL UNIQUE,
         date_of_birth DATE,
         city TEXT,
+        phone TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE members
+      ADD COLUMN IF NOT EXISTS phone TEXT
     `);
 
     await client.query(`

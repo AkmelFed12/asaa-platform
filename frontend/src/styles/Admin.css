@@ -775,6 +775,14 @@
   margin-top: 10px;
 }
 
+.member-inline-upload {
+  margin-top: 10px;
+}
+
+.member-inline-upload .photo-upload-container {
+  max-width: 360px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .admin-header h2 {

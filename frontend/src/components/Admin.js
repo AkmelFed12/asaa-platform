@@ -58,6 +58,7 @@ const Admin = ({ isAdmin }) => {
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
+  const [memberUploadId, setMemberUploadId] = useState(null);
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -1825,8 +1826,10 @@ const Admin = ({ isAdmin }) => {
                   <th>Nom</th>
                   <th>Email</th>
                   <th>Numéro</th>
+                  <th>Téléphone</th>
                   <th>Ville</th>
                   <th>Naissance</th>
+                  <th>Photo</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1837,6 +1840,16 @@ const Admin = ({ isAdmin }) => {
                     <td>{member.first_name} {member.last_name}</td>
                     <td>{member.email}</td>
                     <td>{member.member_number}</td>
+                    <td>
+                      <input
+                        type="text"
+                        value={memberEdit[member.id]?.phone ?? member.phone ?? ''}
+                        onChange={(e) => setMemberEdit((prev) => ({
+                          ...prev,
+                          [member.id]: { ...prev[member.id], phone: e.target.value }
+                        }))}
+                      />
+                    </td>
                     <td>
                       <input
                         type="text"
@@ -1856,6 +1869,33 @@ const Admin = ({ isAdmin }) => {
                           [member.id]: { ...prev[member.id], date_of_birth: e.target.value }
                         }))}
                       />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-action btn-reset"
+                        onClick={() => setMemberUploadId(member.id)}
+                      >
+                        Uploader
+                      </button>
+                      {memberUploadId === member.id && (
+                        <div className="member-inline-upload">
+                          <PhotoUpload
+                            memberId={member.id}
+                            onUploadSuccess={() => {
+                              pushToast('Photo ajoutee.', 'success');
+                              setMemberUploadId(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-action btn-delete"
+                            onClick={() => setMemberUploadId(null)}
+                          >
+                            Fermer
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="actions">
                       <button
