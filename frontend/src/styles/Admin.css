@@ -481,6 +481,18 @@
   border: 1px solid #eee;
 }
 
+.event-image-thumb {
+  display: block;
+  max-width: 120px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  margin-bottom: 8px;
+}
+
+.event-inline-upload {
+  margin-top: 10px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .admin-header h2 {

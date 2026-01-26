@@ -374,6 +374,105 @@ router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.post('/daily/admin/replace', requireAdmin, async (req, res, next) => {
+  const { position, newQuestionId } = req.body;
+  const numericPosition = Number(position);
+  const numericQuestionId = Number(newQuestionId);
+
+  if (Number.isNaN(numericPosition) || Number.isNaN(numericQuestionId)) {
+    return res.status(400).json({ error: 'Position and question id required' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { quizId } = await getOrCreateDailyQuiz();
+    const { rows: attemptRows } = await client.query(
+      'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
+      [quizId]
+    );
+
+    if (attemptRows[0].count > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Quiz already started' });
+    }
+
+    const { rows: currentRows } = await client.query(
+      `SELECT question_id
+       FROM daily_quiz_questions
+       WHERE quiz_id = $1 AND position = $2`,
+      [quizId, numericPosition]
+    );
+    const currentQuestionId = currentRows[0]?.question_id;
+    if (!currentQuestionId) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Position not found' });
+    }
+
+    const { rows: questionRows } = await client.query(
+      `SELECT id, question_text, options, difficulty
+       FROM quiz_questions
+       WHERE id = $1 AND is_active = TRUE`,
+      [numericQuestionId]
+    );
+    const newQuestion = questionRows[0];
+    if (!newQuestion) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    const { rows: usedRows } = await client.query(
+      'SELECT 1 FROM quiz_question_usage WHERE question_id = $1',
+      [numericQuestionId]
+    );
+    if (usedRows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Question already used' });
+    }
+
+    const { rows: duplicateRows } = await client.query(
+      'SELECT 1 FROM daily_quiz_questions WHERE quiz_id = $1 AND question_id = $2',
+      [quizId, numericQuestionId]
+    );
+    if (duplicateRows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Question already in daily quiz' });
+    }
+
+    await client.query(
+      `UPDATE daily_quiz_questions
+       SET question_id = $1
+       WHERE quiz_id = $2 AND position = $3`,
+      [numericQuestionId, quizId, numericPosition]
+    );
+
+    await client.query(
+      `INSERT INTO quiz_question_usage (question_id, quiz_date)
+       VALUES ($1, $2)
+       ON CONFLICT (question_id) DO NOTHING`,
+      [numericQuestionId, getToday()]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      question: {
+        id: newQuestion.id,
+        question: newQuestion.question_text,
+        options: newQuestion.options,
+        difficulty: newQuestion.difficulty,
+        position: numericPosition
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/daily/start', async (req, res, next) => {
   if (!ensureQuizOpen(res)) {
     return;

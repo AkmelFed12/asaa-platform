@@ -44,6 +44,7 @@ const Admin = ({ isAdmin }) => {
     image: ''
   });
   const [eventPhotoPreview, setEventPhotoPreview] = useState('');
+  const [eventUploadId, setEventUploadId] = useState(null);
   const [quizCleanupLoading, setQuizCleanupLoading] = useState(false);
   const [events, setEvents] = useState([]);
   const [photoSearchQuery, setPhotoSearchQuery] = useState('');
@@ -404,6 +405,11 @@ const Admin = ({ isAdmin }) => {
       await axios.put(`${API_URL}/api/events/${eventId}`, data, {
         headers: getAuthHeaders()
       });
+      setEvents((prev) =>
+        prev.map((eventItem) =>
+          eventItem.id === eventId ? { ...eventItem, ...data } : eventItem
+        )
+      );
       loadEvents();
     } catch (error) {
       console.error('Error:', error);
@@ -478,6 +484,41 @@ const Admin = ({ isAdmin }) => {
     if (!photo?.url) return;
     setEventForm((prev) => ({ ...prev, image: photo.url }));
     setEventPhotoPreview(photo.url);
+  };
+
+  const handleEventRowPhotoUpload = async (eventId, data) => {
+    const photo = Array.isArray(data) ? data[0] : data;
+    if (!photo?.url) return;
+    await handleUpdateEvent(eventId, { image: photo.url });
+    setEventUploadId(null);
+  };
+
+  const replaceDailyQuestion = async (position) => {
+    const input = window.prompt('Entrez l’ID de la nouvelle question :');
+    if (!input) return;
+    const newQuestionId = Number(input);
+    if (Number.isNaN(newQuestionId)) {
+      setDailyQuizError('ID de question invalide.');
+      return;
+    }
+    setDailyQuizSaving(true);
+    setDailyQuizError('');
+    try {
+      await axios.post(`${API_URL}/api/quiz/daily/admin/replace`, {
+        position,
+        newQuestionId
+      }, {
+        headers: getAuthHeaders()
+      });
+      await loadDailyQuizAdmin();
+      await loadQuizQuestions(true);
+    } catch (error) {
+      console.error('Error:', error);
+      const message = error?.response?.data?.error;
+      setDailyQuizError(message || 'Impossible de remplacer la question.');
+    } finally {
+      setDailyQuizSaving(false);
+    }
   };
 
   const handleCleanupUsedQuestions = async () => {
@@ -848,7 +889,15 @@ const Admin = ({ isAdmin }) => {
                     </div>
                     <div className="quiz-daily-content">
                       <p className="quiz-daily-question">{question.question}</p>
+                      <p className="quiz-daily-meta">ID: {question.id}</p>
                       <p className="quiz-daily-difficulty">Niveau: {question.difficulty}</p>
+                      <button
+                        type="button"
+                        className="btn-action btn-reset"
+                        onClick={() => replaceDailyQuestion(question.position)}
+                      >
+                        Changer la question
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1158,11 +1207,35 @@ const Admin = ({ isAdmin }) => {
                       />
                     </td>
                     <td>
-                      <input
-                        type="url"
-                        defaultValue={event.image || ''}
-                        onBlur={(e) => handleUpdateEvent(event.id, { image: e.target.value })}
-                      />
+                      {event.image && (
+                        <img
+                          src={normalizePhotoUrl(event.image)}
+                          alt="Illustration"
+                          className="event-image-thumb"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="btn-action btn-reset"
+                        onClick={() => setEventUploadId(event.id)}
+                      >
+                        Uploader
+                      </button>
+                      {eventUploadId === event.id && (
+                        <div className="event-inline-upload">
+                          <PhotoUpload
+                            eventId={event.id}
+                            onUploadSuccess={(photo) => handleEventRowPhotoUpload(event.id, photo)}
+                          />
+                          <button
+                            type="button"
+                            className="btn-action btn-delete"
+                            onClick={() => setEventUploadId(null)}
+                          >
+                            Fermer
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="actions">
                       <button
