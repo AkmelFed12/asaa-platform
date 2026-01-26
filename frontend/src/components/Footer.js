@@ -47,6 +47,11 @@ const Footer = ({ onNavigate }) => {
               </button>
             </li>
             <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'activities')}>
+                Nos activites
+              </button>
+            </li>
+            <li>
               <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'contact')}>
                 Contact
               </button>

@@ -165,7 +165,74 @@ function App() {
 
             <section className="status-section" id="privacy">
               <h2>Politique de confidentialite</h2>
-              <p>Nous protegens les donnees des membres et n'utilisons pas vos informations a des fins commerciales.</p>
+              <p>
+                La presente politique de confidentialite decrit la maniere dont l'Association des Serviteurs d'Allah
+                Azawajal (ASAA) collecte, utilise, protege et traite les donnees personnelles des utilisateurs du site.
+              </p>
+              <p>En utilisant ce site, vous acceptez les pratiques decrites dans la presente politique.</p>
+              <h3>1. Responsable du traitement des donnees</h3>
+              <p>
+                Le responsable du traitement des donnees personnelles est : ASAA - Association des Serviteurs d'Allah
+                Azawajal, organisation a caractere religieux, educatif et social.
+              </p>
+              <h3>2. Donnees personnelles collectees</h3>
+              <ul>
+                <li>Nom et prenom</li>
+                <li>Adresse e-mail</li>
+                <li>Numero de telephone</li>
+                <li>Informations transmises via les formulaires de contact ou d'inscription</li>
+              </ul>
+              <p>Aucune donnee personnelle n'est collectee a votre insu.</p>
+              <h3>3. Finalites de la collecte</h3>
+              <ul>
+                <li>Repondre aux demandes envoyees via le site</li>
+                <li>Gerer les inscriptions aux activites et evenements</li>
+                <li>Informer les membres des actions et communications de l'ASAA</li>
+                <li>Ameliorer le fonctionnement et le contenu du site</li>
+              </ul>
+              <h3>4. Confidentialite et partage</h3>
+              <ul>
+                <li>Les donnees ne sont ni vendues, ni louees, ni cedées a des tiers</li>
+                <li>Partage possible uniquement avec les responsables internes, pour les finalites ci-dessus</li>
+              </ul>
+              <h3>5. Securite des donnees</h3>
+              <p>
+                L'ASAA met en oeuvre des mesures techniques et organisationnelles pour proteger les donnees contre la
+                perte, l'acces non autorise, la divulgation ou la modification abusive.
+              </p>
+              <h3>6. Duree de conservation</h3>
+              <p>
+                Les donnees personnelles sont conservees uniquement pendant la duree necessaire aux objectifs pour
+                lesquels elles ont ete collectees, sauf obligation legale contraire.
+              </p>
+              <h3>7. Droits des utilisateurs</h3>
+              <ul>
+                <li>Droit d'acces a ses donnees</li>
+                <li>Droit de rectification des donnees inexactes</li>
+                <li>Droit de suppression</li>
+                <li>Droit d'opposition a l'utilisation</li>
+              </ul>
+              <p>
+                Toute demande relative a ces droits peut etre adressee a l'ASAA via les moyens de contact du site.
+              </p>
+              <h3>8. Cookies</h3>
+              <p>
+                Le site peut utiliser des cookies pour le fonctionnement et l'amelioration de l'experience utilisateur.
+                L'utilisateur peut configurer son navigateur pour refuser les cookies.
+              </p>
+              <h3>9. Modification de la politique</h3>
+              <p>
+                L'ASAA se reserve le droit de modifier la presente politique a tout moment. Les modifications prennent
+                effet des leur publication sur le site.
+              </p>
+              <h3>10. Contact</h3>
+              <p>Pour toute question, contactez l'ASAA :</p>
+              <ul>
+                <li>0574724233</li>
+                <li>0705583082</li>
+                <li>0779382233</li>
+                <li>0151495971</li>
+              </ul>
             </section>
 
             <section className="status-section" id="terms">
