@@ -1,95 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../services/api';
-import PhotoUpload from './PhotoUpload';
-import '../styles/PhotoUpload.css';
+import '../styles/MemberProfile.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const MemberProfile = ({ user }) => {
-  const [member, setMember] = useState(null);
-  const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const loadMember = async () => {
-    if (!user?.id) return;
-    try {
-      const response = await apiClient.get(`/api/members/user/${user.id}`);
-      setMember(response.data?.data || null);
-    } catch (error) {
-      console.error('Error:', error);
-      setMember(null);
-    }
-  };
-
-  const loadPhotos = async (memberId) => {
-    if (!memberId) return;
-    try {
-      const response = await apiClient.get(`/api/photos/member/${memberId}/photos`);
-      setPhotos(response.data?.photos || []);
-    } catch (error) {
-      console.error('Error:', error);
-      setPhotos([]);
-    }
-  };
-
-  const setPrimaryPhoto = async (photoId) => {
-    if (!member?.id) return;
-    setLoading(true);
-    try {
-      await apiClient.put(`/api/photos/member/${member.id}/primary/${photoId}`);
-      await loadPhotos(member.id);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deletePhoto = async (photoId) => {
-    if (!photoId) return;
-    if (!window.confirm('Supprimer cette photo?')) return;
-    setLoading(true);
-    try {
-      await apiClient.delete(`/api/photos/photo/${photoId}`);
-      await loadPhotos(member.id);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [members, setMembers] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadMember();
+    const loadMembers = async () => {
+      if (!user?.id) return;
+      setLoading(true);
+      setError('');
+      try {
+        const response = await apiClient.get('/api/members');
+        setMembers(response.data?.data || []);
+      } catch (loadError) {
+        console.error('Error:', loadError);
+        setError('Impossible de charger les membres.');
+        setMembers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMembers();
   }, [user?.id]);
 
-  useEffect(() => {
-    if (member?.id) {
-      loadPhotos(member.id);
-    }
-  }, [member?.id]);
-
-  const isAdmin = user?.role === 'admin';
-
-  if (!member) {
-    return (
-      <div className="governance-container">
-        <h2>Profil</h2>
-        <p>Profil membre introuvable.</p>
-        <div className="admin-section">
-          <h3>Suggestions</h3>
-          <p>Seul l'admin peut creer ou modifier les informations membres.</p>
-          <ul>
-            <li>Contactez l'admin pour creer votre profil membre.</li>
-            <li>Confirmez votre numero de membre et votre email.</li>
-            <li>Demandez l'ajout de votre photo si besoin.</li>
-          </ul>
-        </div>
-      </div>
-    );
-  }
-
-  const primaryPhoto = photos.find((photo) => photo.is_primary);
   const normalizePhotoUrl = (url) => {
     if (!url) return url;
     if (url.startsWith('/uploads/')) {
@@ -100,68 +38,34 @@ const MemberProfile = ({ user }) => {
 
   return (
     <div className="governance-container">
-      <h2>Profil Membre</h2>
-      <p className="subtitle">{member.first_name} {member.last_name}</p>
+      <h2>Membres</h2>
+      <p className="subtitle">Annuaire des membres</p>
 
-      {primaryPhoto && (
-        <div className="uploaded-photo profile-photo">
-          <img src={normalizePhotoUrl(primaryPhoto.url)} alt={primaryPhoto.filename} />
-          <p className="photo-name">Photo principale</p>
-        </div>
+      {loading && <p>Chargement...</p>}
+      {error && <p className="member-error">{error}</p>}
+      {!loading && !error && members.length === 0 && (
+        <p>Aucun membre enregistre.</p>
       )}
-
-      <div className="admin-section">
-        <h3>Infos</h3>
-        <p>Email: {member.email}</p>
-        <p>Numero membre: {member.member_number}</p>
-        <p>Ville: {member.city || '-'}</p>
-        <p>Telephone: {member.phone || '-'}</p>
-        <p>Date de naissance: {member.date_of_birth ? member.date_of_birth.split('T')[0] : '-'}</p>
-      </div>
-
-      {isAdmin ? (
-        <PhotoUpload
-          memberId={member.id}
-          onUploadSuccess={() => loadPhotos(member.id)}
-        />
-      ) : (
-        <div className="admin-section">
-          <h3>Photos</h3>
-          <p>Seul l'admin peut modifier ou ajouter des photos.</p>
-        </div>
-      )}
-
-      {photos.length > 0 && (
-        <div className="uploaded-photos">
-          <h4>Mes photos</h4>
-          <div className="photos-grid">
-            {photos.map((photo) => (
-              <div key={photo.id} className="uploaded-photo">
-                <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
-                <p className="photo-name">{photo.original_name}</p>
-                {isAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-action btn-reset"
-                      onClick={() => setPrimaryPhoto(photo.id)}
-                      disabled={loading}
-                    >
-                      {photo.is_primary ? 'Principale' : 'Definir principale'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-action btn-delete"
-                      onClick={() => deletePhoto(photo.id)}
-                      disabled={loading}
-                    >
-                      Supprimer
-                    </button>
-                  </>
+      {members.length > 0 && (
+        <div className="member-grid">
+          {members.map((member) => (
+            <div key={member.id} className="member-card">
+              <div className="member-photo">
+                {member.photo_url ? (
+                  <img src={normalizePhotoUrl(member.photo_url)} alt={member.first_name} />
+                ) : (
+                  <div className="member-photo-placeholder">👤</div>
                 )}
               </div>
-            ))}
-          </div>
+              <div className="member-info">
+                <h3>{member.first_name} {member.last_name}</h3>
+                <p>Numero membre: {member.member_number}</p>
+                <p>Email: {member.email}</p>
+                <p>Telephone: {member.phone || '-'}</p>
+                <p>Ville: {member.city || '-'}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
