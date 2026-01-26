@@ -136,8 +136,26 @@ function App() {
             </section>
 
             <section className="status-section" id="about">
-              <h2>À propos de nous</h2>
-              <p>ASAA soutient la formation et l'organisation communautaire à travers des outils simples et efficaces.</p>
+              <h2>ASAA - Association des Serviteurs d'Allah Azawajal</h2>
+              <p><strong>Valeurs fondamentales:</strong> Respect - Tolerance - Pardon</p>
+              <p>
+                L'Association des Serviteurs d'Allah Azawajal (ASAA) est une organisation a vocation religieuse, sociale
+                et educative, engagee dans la promotion des valeurs islamiques authentiques et du vivre-ensemble
+                harmonieux. Elle oeuvre pour le renforcement de la foi, de la fraternite et de la solidarite entre ses
+                membres et au sein de la communaute.
+              </p>
+              <p>
+                Guidee par les principes de respect, de tolerance et de pardon, l'ASAA place l'etre humain au coeur de
+                son action, en favorisant une pratique de l'Islam basee sur la connaissance, l'ethique et la
+                responsabilite sociale.
+              </p>
+              <h3>Notre mission</h3>
+              <ul>
+                <li>Renforcer la cohesion fraternelle entre les membres</li>
+                <li>Encourager l'apprentissage et la transmission des enseignements islamiques</li>
+                <li>Sensibiliser la jeunesse aux valeurs morales et spirituelles de l'Islam</li>
+                <li>Contribuer activement au bien-etre social a travers des actions solidaires</li>
+              </ul>
             </section>
 
             <section className="status-section" id="contact">
@@ -146,13 +164,38 @@ function App() {
             </section>
 
             <section className="status-section" id="privacy">
-              <h2>Politique de confidentialité</h2>
-              <p>Nous protégeons les données des membres et n'utilisons pas vos informations à des fins commerciales.</p>
+              <h2>Politique de confidentialite</h2>
+              <p>Nous protegens les donnees des membres et n'utilisons pas vos informations a des fins commerciales.</p>
             </section>
 
             <section className="status-section" id="terms">
               <h2>Conditions d'utilisation</h2>
-              <p>L'utilisation de la plateforme implique le respect des règles et la bonne conduite en communauté.</p>
+              <p>L'utilisation de la plateforme implique le respect des regles et la bonne conduite en communaute.</p>
+            </section>
+
+            <section className="status-section" id="activities">
+              <h2>Nos activites - Annee 2026</h2>
+              <h3>1. Activites ponctuelles</h3>
+              <ul>
+                <li><strong>Janvier:</strong> Sortie detente du Bureau - rencontre fraternelle pour renforcer la cohesion interne.</li>
+                <li><strong>Fevrier:</strong> Rupture collective - moment de partage reunissant l'ensemble des membres.</li>
+                <li><strong>Mars:</strong> Match de gala et lancement du Quiz Islamique 2026 - fraternite et ouverture des preselections.</li>
+                <li><strong>Juillet:</strong> Cloture des preselections - selection des candidats pour la grande finale.</li>
+                <li><strong>Aout:</strong> Grande finale du Quiz Islamique - evenement phare de l'annee.</li>
+                <li><strong>Septembre:</strong> Actions sociales et recueillement - Ziara et visites solidaires aux malades.</li>
+                <li><strong>Decembre:</strong> Conference de fin d'annee - sensibilisation sur les derives des festivites.</li>
+              </ul>
+              <h3>2. Activites permanentes</h3>
+              <ul>
+                <li><strong>Le Grin Religieux:</strong> rencontre hebdomadaire chaque dimanche, apprentissage et echange.</li>
+                <li><strong>Rencontres tournantes:</strong> reunions chez les membres pour renforcer les liens familiaux.</li>
+                <li><strong>Echanges et formations:</strong> causeries, debats et enseignements islamiques reguliers.</li>
+              </ul>
+              <h3>Notre engagement</h3>
+              <p>
+                A travers ses actions, l'ASAA s'engage a etre un cadre de reference pour l'education spirituelle, la
+                solidarite et l'epanouissement moral de ses membres, dans le respect des valeurs islamiques et humaines.
+              </p>
             </section>
           </>
         )}
