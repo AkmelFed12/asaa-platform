@@ -99,6 +99,17 @@ router.post('/event/:eventId/photo', requireAdmin, (req, res, next) => {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
     }
 
+    const { rows: existingRows } = await pool.query(
+      'SELECT id, filename FROM event_photos WHERE event_id = $1',
+      [eventId]
+    );
+    for (const row of existingRows) {
+      deleteImage(row.filename);
+    }
+    if (existingRows.length > 0) {
+      await pool.query('DELETE FROM event_photos WHERE event_id = $1', [eventId]);
+    }
+
     const dataUrl = req.file ? await imageToBase64(req.file.path) : null;
     const photoData = {
       filename: req.file.filename,
@@ -113,6 +124,10 @@ router.post('/event/:eventId/photo', requireAdmin, (req, res, next) => {
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, event_id, filename, original_name, COALESCE(data_url, url) AS url, size, uploaded_at`,
       [eventId, photoData.filename, photoData.originalName, photoData.url, photoData.dataUrl, photoData.size]
+    );
+    await pool.query(
+      'UPDATE events SET image = $1 WHERE id = $2',
+      [photoData.url, eventId]
     );
 
     res.json({

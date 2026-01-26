@@ -881,6 +881,26 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.get('/admin/stats', requireAdmin, async (req, res, next) => {
+  try {
+    const today = getToday();
+    const { rows } = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM quiz_questions) AS total_questions,
+         (SELECT COUNT(*)::int FROM quiz_questions
+          WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)) AS unused_questions,
+         (SELECT COUNT(*)::int FROM quiz_question_usage WHERE quiz_date = $1) AS used_today,
+         (SELECT COUNT(*)::int FROM daily_quiz_questions dq
+          JOIN daily_quizzes dqz ON dqz.id = dq.quiz_id
+          WHERE dqz.quiz_date = $1) AS daily_count`,
+      [today]
+    );
+    res.json({ success: true, stats: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/questions/export/csv', requireAdmin, async (req, res, next) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const unusedOnly = req.query.unused === 'true';

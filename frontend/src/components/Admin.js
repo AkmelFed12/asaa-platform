@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import PhotoUpload from './PhotoUpload';
 import '../styles/Admin.css';
@@ -39,6 +39,9 @@ const Admin = ({ isAdmin }) => {
   const [quizHistory, setQuizHistory] = useState([]);
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
   const [quizHistoryError, setQuizHistoryError] = useState('');
+  const [quizStats, setQuizStats] = useState(null);
+  const [quizStatsError, setQuizStatsError] = useState('');
+  const quizDailyRef = useRef(null);
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -75,6 +78,7 @@ const Admin = ({ isAdmin }) => {
       loadDailyQuizAdmin();
       loadQuizQuestions(true);
       loadQuizHistory();
+      loadQuizStats();
     }
   }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
 
@@ -332,6 +336,20 @@ const Admin = ({ isAdmin }) => {
       setQuizHistory([]);
     } finally {
       setQuizHistoryLoading(false);
+    }
+  };
+
+  const loadQuizStats = async () => {
+    setQuizStatsError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/admin/stats`, {
+        headers: getAuthHeaders()
+      });
+      setQuizStats(response.data?.stats || null);
+    } catch (error) {
+      console.error('Error:', error);
+      setQuizStatsError('Impossible de charger les statistiques.');
+      setQuizStats(null);
     }
   };
 
@@ -928,6 +946,13 @@ const Admin = ({ isAdmin }) => {
                 >
                   {quizCleanupLoading ? 'Nettoyage...' : 'Nettoyer les questions utilisees'}
                 </button>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={() => quizDailyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  Apercu du quiz
+                </button>
               </div>
             </div>
             {dailyQuizDate && (
@@ -940,7 +965,7 @@ const Admin = ({ isAdmin }) => {
               <p>Aucune question disponible.</p>
             )}
             {dailyQuizQuestions.length > 0 && (
-              <div className="quiz-daily-list">
+              <div className="quiz-daily-list" ref={quizDailyRef}>
                 {dailyQuizQuestions.map((question, index) => (
                   <div key={question.id} className="quiz-daily-item">
                     <div className="quiz-daily-order">
@@ -1059,6 +1084,44 @@ const Admin = ({ isAdmin }) => {
                   Export CSV
                 </button>
               </div>
+            </div>
+            <div className="quiz-stats-section">
+              <div className="section-header">
+                <h3>Statistiques des questions</h3>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={loadQuizStats}
+                >
+                  Rafraichir
+                </button>
+              </div>
+              {quizStatsError && <p className="quiz-daily-error">{quizStatsError}</p>}
+              {quizStats && (
+                <div className="quiz-stats-grid">
+                  <div className="stat-card">
+                    <h3>{quizStats.total_questions}</h3>
+                    <p>Total questions</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>{quizStats.unused_questions}</h3>
+                    <p>Non utilisees</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>{quizStats.used_today}</h3>
+                    <p>Utilisees aujourd'hui</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>{quizStats.daily_count}</h3>
+                    <p>Questions du jour</p>
+                  </div>
+                </div>
+              )}
+              {quizStats && quizStats.unused_questions < 200 && (
+                <p className="quiz-low-warning">
+                  Attention: il reste peu de questions non utilisees. Pensez a en ajouter.
+                </p>
+              )}
             </div>
             {quizQuestionsError && (
               <p className="quiz-daily-error">{quizQuestionsError}</p>

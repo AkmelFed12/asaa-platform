@@ -533,6 +533,22 @@
   color: #555;
 }
 
+.quiz-stats-section {
+  margin: 20px 0;
+}
+
+.quiz-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.quiz-low-warning {
+  margin-top: 10px;
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .event-photo-upload {
   grid-column: 1 / -1;
 }
