@@ -114,6 +114,10 @@ function App() {
               <p>Association des Serviteurs d'Allah Azawajal</p>
             </section>
 
+            <div className="home-banner">
+              <span>Annonce:</span> Suivez les actualites de l'association et les prochaines activites.
+            </div>
+
             <section className="home-grid">
               <div className="home-card">
                 <h3>👤 Membres</h3>
@@ -285,6 +289,22 @@ function App() {
               <li>Respecter les autres membres et leurs informations</li>
               <li>Ne pas diffuser de contenus inappropries</li>
               <li>Utiliser les services de maniere responsable</li>
+            </ul>
+            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
+              Retour a l'accueil
+            </button>
+          </section>
+        )}
+
+        {currentPage === 'faq' && (
+          <section className="status-section">
+            <h2>FAQ</h2>
+            <ul>
+              <li><strong>Comment participer au quiz ?</strong> Rendez-vous dans l'onglet Quiz et commencez la session.</li>
+              <li><strong>J'ai oublie mon mot de passe.</strong> Contactez un administrateur pour reinitialiser votre acces.</li>
+              <li><strong>Comment mettre a jour mon profil ?</strong> Ouvrez l'onglet Profil et completez vos informations.</li>
+              <li><strong>Comment ajouter un evenement ?</strong> Les admins peuvent creer ou modifier des evenements.</li>
+              <li><strong>Qui contacter en cas de probleme ?</strong> Utilisez la page Contact ou les numeros affiches.</li>
             </ul>
             <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
               Retour a l'accueil

@@ -179,6 +179,23 @@
   background: #184c23;
 }
 
+.home-banner {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: -10px auto 24px;
+  max-width: 900px;
+  border-left: 4px solid #1d5c2a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+.home-banner span {
+  font-weight: 700;
+  color: #1d5c2a;
+  margin-right: 6px;
+}
+
 .contact-card {
   margin: 20px 0;
   padding: 18px;

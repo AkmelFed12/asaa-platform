@@ -47,9 +47,14 @@ const Admin = ({ isAdmin }) => {
   const [specialDifficulty, setSpecialDifficulty] = useState('');
   const [specialKeyword, setSpecialKeyword] = useState('');
   const [specialGenerating, setSpecialGenerating] = useState(false);
+  const [quizImportFile, setQuizImportFile] = useState(null);
+  const [quizImportLoading, setQuizImportLoading] = useState(false);
+  const [autoSaveMap, setAutoSaveMap] = useState({});
+  const [toasts, setToasts] = useState([]);
   const quizDailyRef = useRef(null);
   const dailyQuizQuestionsRef = useRef([]);
-  const autoSaveTimerRef = useRef(null);
+  const autoSaveTimerRef = useRef({});
+  const quizQuestionsRef = useRef([]);
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -95,9 +100,21 @@ const Admin = ({ isAdmin }) => {
     dailyQuizQuestionsRef.current = dailyQuizQuestions;
   }, [dailyQuizQuestions]);
 
+  useEffect(() => {
+    quizQuestionsRef.current = quizQuestions;
+  }, [quizQuestions]);
+
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
   });
+
+  const pushToast = (message, type = 'success') => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3500);
+  };
   const normalizePhotoUrl = (url) => {
     if (!url) return url;
     if (url.startsWith('/uploads/')) {
@@ -281,20 +298,22 @@ const Admin = ({ isAdmin }) => {
         headers: getAuthHeaders()
       });
       await loadDailyQuizAdmin();
+      pushToast('Ordre du quiz enregistre.', 'success');
     } catch (error) {
       console.error('Error:', error);
       const message = error?.response?.data?.error;
       setDailyQuizError(message || 'Impossible d’enregistrer l’ordre.');
+      pushToast('Erreur lors de la sauvegarde de l ordre.', 'error');
     } finally {
       setDailyQuizSaving(false);
     }
   };
 
   const scheduleAutoSave = () => {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
+    if (autoSaveTimerRef.current.order) {
+      clearTimeout(autoSaveTimerRef.current.order);
     }
-    autoSaveTimerRef.current = setTimeout(() => {
+    autoSaveTimerRef.current.order = setTimeout(() => {
       saveDailyQuizOrder(dailyQuizQuestionsRef.current);
     }, 600);
   };
@@ -411,6 +430,7 @@ const Admin = ({ isAdmin }) => {
         return question;
       })
     );
+    scheduleAutoSaveQuestion(id);
   };
 
   const saveQuizQuestion = async (question) => {
@@ -423,10 +443,45 @@ const Admin = ({ isAdmin }) => {
       }, {
         headers: getAuthHeaders()
       });
+      pushToast('Question mise a jour.', 'success');
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de la mise à jour.');
     }
+  };
+
+  const scheduleAutoSaveQuestion = (questionId) => {
+    if (autoSaveTimerRef.current[questionId]) {
+      clearTimeout(autoSaveTimerRef.current[questionId]);
+    }
+    setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'pending' }));
+    autoSaveTimerRef.current[questionId] = setTimeout(async () => {
+      const question = quizQuestionsRef.current.find((item) => item.id === questionId);
+      if (!question) return;
+      setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'saving' }));
+      try {
+        await axios.put(`${API_URL}/api/quiz/questions/${questionId}`, {
+          question: question.question,
+          options: question.options,
+          correctIndex: question.correctIndex,
+          difficulty: question.difficulty
+        }, {
+          headers: getAuthHeaders()
+        });
+        setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'saved' }));
+        setTimeout(() => {
+          setAutoSaveMap((prev) => {
+            const next = { ...prev };
+            delete next[questionId];
+            return next;
+          });
+        }, 1500);
+      } catch (error) {
+        console.error('Error:', error);
+        setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'error' }));
+        pushToast('Erreur pendant la sauvegarde auto.', 'error');
+      }
+    }, 800);
   };
 
   const loadMemberPhotos = async (memberId) => {
@@ -609,10 +664,12 @@ const Admin = ({ isAdmin }) => {
       });
       await loadDailyQuizAdmin();
       await loadQuizQuestions(true);
+      pushToast('Question remplacee.', 'success');
     } catch (error) {
       console.error('Error:', error);
       const message = error?.response?.data?.error;
       setDailyQuizError(message || 'Impossible de remplacer la question.');
+      pushToast('Erreur lors du remplacement.', 'error');
     } finally {
       setDailyQuizSaving(false);
     }
@@ -647,10 +704,12 @@ const Admin = ({ isAdmin }) => {
       });
       await loadDailyQuizAdmin();
       await loadQuizStats();
+      pushToast('Quiz special genere.', 'success');
     } catch (error) {
       console.error('Error:', error);
       const message = error?.response?.data?.error;
       setDailyQuizError(message || 'Impossible de generer le quiz.');
+      pushToast('Generation du quiz echouee.', 'error');
     } finally {
       setSpecialGenerating(false);
     }
@@ -664,13 +723,14 @@ const Admin = ({ isAdmin }) => {
         headers: getAuthHeaders()
       });
       const deleted = response.data?.deletedQuestions ?? 0;
-      alert(`Nettoyage termine. Questions supprimees: ${deleted}`);
+      pushToast(`Nettoyage termine. Supprimees: ${deleted}`, 'success');
       await loadDailyQuizAdmin();
       await loadQuizQuestions(true);
     } catch (error) {
       console.error('Error:', error);
       const message = error?.response?.data?.error;
       setDailyQuizError(message || 'Impossible de nettoyer les questions.');
+      pushToast('Erreur lors du nettoyage.', 'error');
     } finally {
       setQuizCleanupLoading(false);
     }
@@ -693,6 +753,33 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const importQuestionsCsv = async () => {
+    if (!quizImportFile) {
+      pushToast('Selectionnez un fichier CSV.', 'error');
+      return;
+    }
+    setQuizImportLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', quizImportFile);
+      const response = await axios.post(`${API_URL}/api/quiz/questions/import`, formData, {
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      pushToast(`Import termine: ${response.data?.inserted || 0} questions.`, 'success');
+      setQuizImportFile(null);
+      await loadQuizQuestions(true);
+      await loadQuizStats();
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Import CSV echoue.', 'error');
+    } finally {
+      setQuizImportLoading(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="admin-container">
@@ -706,6 +793,15 @@ const Admin = ({ isAdmin }) => {
 
   return (
     <div className="admin-container">
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="admin-header">
         <h2>🔧 Panneau d'Administration</h2>
         <p>Gestion des utilisateurs et des ressources de la plateforme</p>
@@ -1177,6 +1273,21 @@ const Admin = ({ isAdmin }) => {
                 >
                   Export CSV
                 </button>
+                <div className="quiz-import">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setQuizImportFile(e.target.files?.[0] || null)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-create-user"
+                    onClick={importQuestionsCsv}
+                    disabled={quizImportLoading}
+                  >
+                    {quizImportLoading ? 'Import...' : 'Importer CSV'}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="quiz-stats-section">
@@ -1314,6 +1425,14 @@ const Admin = ({ isAdmin }) => {
                       >
                         Enregistrer
                       </button>
+                      {autoSaveMap[question.id] && (
+                        <span className="auto-save-status">
+                          {autoSaveMap[question.id] === 'saving' && 'Auto-sauvegarde...'}
+                          {autoSaveMap[question.id] === 'saved' && 'Sauvegarde ok'}
+                          {autoSaveMap[question.id] === 'error' && 'Erreur sauvegarde'}
+                          {autoSaveMap[question.id] === 'pending' && 'Modification...'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

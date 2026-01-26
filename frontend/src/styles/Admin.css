@@ -570,6 +570,54 @@
   text-align: left;
 }
 
+.quiz-import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quiz-import input[type="file"] {
+  padding: 8px;
+  border: 2px dashed #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.auto-save-status {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.toast {
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  font-weight: 600;
+}
+
+.toast.success {
+  background: #e8f7ef;
+  color: #1e7a45;
+  border: 1px solid #bfe5cd;
+}
+
+.toast.error {
+  background: #ffecec;
+  color: #b33a3a;
+  border: 1px solid #f3b6b6;
+}
+
 .quiz-stats-section {
   margin: 20px 0;
 }

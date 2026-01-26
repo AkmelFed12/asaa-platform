@@ -66,6 +66,11 @@ const Footer = ({ onNavigate }) => {
                 Conditions d'utilisation
               </button>
             </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('faq')}>
+                FAQ
+              </button>
+            </li>
           </ul>
         </div>
 

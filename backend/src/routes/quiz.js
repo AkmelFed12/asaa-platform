@@ -5,6 +5,7 @@ const { calculateLevel } = require('../utils/quizEngine');
 const { sendQuizNotification } = require('../utils/emailService');
 const websocketManager = require('../utils/websocketManager');
 const { requireAdmin } = require('../middleware/auth');
+const multer = require('multer');
 
 const DAILY_QUESTION_COUNT = 20;
 const TIME_PER_QUESTION = 10;
@@ -12,6 +13,70 @@ const QUIZ_OPEN_HOUR = 20;
 const QUIZ_CLOSE_HOUR = 23;
 const QUIZ_CLOSE_MINUTE = 59;
 const QUIZ_TIMEZONE = 'Africa/Abidjan';
+const CSV_IMPORT_LIMIT = 500;
+const VALID_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const name = (file.originalname || '').toLowerCase();
+    const isCsv = file.mimetype === 'text/csv' || name.endsWith('.csv');
+    if (!isCsv) {
+      return cb(new Error('CSV file required'));
+    }
+    cb(null, true);
+  }
+});
+
+const parseCsvLine = (line) => {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  result.push(current);
+  return result.map((value) => value.trim());
+};
+
+const parseCsv = (content) => {
+  const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const rows = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const values = parseCsvLine(lines[i]);
+    if (i === 0 && values[0] === 'question') {
+      continue;
+    }
+    rows.push(values);
+  }
+
+  return rows;
+};
+
+const normalizeDifficulty = (value) => {
+  const lowered = String(value || '').toLowerCase();
+  return VALID_DIFFICULTIES.has(lowered) ? lowered : null;
+};
 
 const getToday = () => new Date().toISOString().split('T')[0];
 const getTimeInZone = (now, timeZone) => {
@@ -969,6 +1034,79 @@ router.get('/admin/stats', requireAdmin, async (req, res, next) => {
       [today]
     );
     res.json({ success: true, stats: rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/questions/import', requireAdmin, csvUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'CSV file required' });
+    }
+
+    const content = req.file.buffer.toString('utf-8');
+    const rows = parseCsv(content);
+    const prepared = [];
+    let skipped = 0;
+
+    for (const row of rows) {
+      if (row.length < 7) {
+        skipped += 1;
+        continue;
+      }
+      const [question, option1, option2, option3, option4, correctIndexRaw, difficultyRaw] = row;
+      const correctIndex = Number(correctIndexRaw);
+      const difficulty = normalizeDifficulty(difficultyRaw);
+      if (!question || Number.isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3 || !difficulty) {
+        skipped += 1;
+        continue;
+      }
+      prepared.push({
+        question,
+        options: [option1, option2, option3, option4],
+        correctIndex,
+        difficulty,
+        createdBy: 'csv-import'
+      });
+    }
+
+    if (prepared.length === 0) {
+      return res.status(400).json({ error: 'No valid rows to import' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < prepared.length; i += CSV_IMPORT_LIMIT) {
+        const chunk = prepared.slice(i, i + CSV_IMPORT_LIMIT);
+        const values = [];
+        const placeholders = chunk.map((row, index) => {
+          const offset = index * 5;
+          values.push(
+            row.question,
+            JSON.stringify(row.options),
+            row.correctIndex,
+            row.difficulty,
+            row.createdBy
+          );
+          return `($${offset + 1}, $${offset + 2}::jsonb, $${offset + 3}, $${offset + 4}, $${offset + 5})`;
+        });
+        await client.query(
+          `INSERT INTO quiz_questions (question_text, options, correct_index, difficulty, created_by)
+           VALUES ${placeholders.join(', ')}`,
+          values
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    res.json({ success: true, inserted: prepared.length, skipped });
   } catch (error) {
     next(error);
   }
