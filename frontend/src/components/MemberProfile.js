@@ -69,11 +69,22 @@ const MemberProfile = ({ user }) => {
     }
   }, [member?.id]);
 
+  const isAdmin = user?.role === 'admin';
+
   if (!member) {
     return (
       <div className="governance-container">
         <h2>Profil</h2>
         <p>Profil membre introuvable.</p>
+        <div className="admin-section">
+          <h3>Suggestions</h3>
+          <p>Seul l'admin peut creer ou modifier les informations membres.</p>
+          <ul>
+            <li>Contactez l'admin pour creer votre profil membre.</li>
+            <li>Confirmez votre numero de membre et votre email.</li>
+            <li>Demandez l'ajout de votre photo si besoin.</li>
+          </ul>
+        </div>
       </div>
     );
   }
@@ -104,13 +115,21 @@ const MemberProfile = ({ user }) => {
         <p>Email: {member.email}</p>
         <p>Numero membre: {member.member_number}</p>
         <p>Ville: {member.city || '-'}</p>
+        <p>Telephone: {member.phone || '-'}</p>
         <p>Date de naissance: {member.date_of_birth ? member.date_of_birth.split('T')[0] : '-'}</p>
       </div>
 
-      <PhotoUpload
-        memberId={member.id}
-        onUploadSuccess={() => loadPhotos(member.id)}
-      />
+      {isAdmin ? (
+        <PhotoUpload
+          memberId={member.id}
+          onUploadSuccess={() => loadPhotos(member.id)}
+        />
+      ) : (
+        <div className="admin-section">
+          <h3>Photos</h3>
+          <p>Seul l'admin peut modifier ou ajouter des photos.</p>
+        </div>
+      )}
 
       {photos.length > 0 && (
         <div className="uploaded-photos">
@@ -120,22 +139,26 @@ const MemberProfile = ({ user }) => {
               <div key={photo.id} className="uploaded-photo">
                 <img src={normalizePhotoUrl(photo.url)} alt={photo.filename} />
                 <p className="photo-name">{photo.original_name}</p>
-                <button
-                  type="button"
-                  className="btn-action btn-reset"
-                  onClick={() => setPrimaryPhoto(photo.id)}
-                  disabled={loading}
-                >
-                  {photo.is_primary ? 'Principale' : 'Definir principale'}
-                </button>
-                <button
-                  type="button"
-                  className="btn-action btn-delete"
-                  onClick={() => deletePhoto(photo.id)}
-                  disabled={loading}
-                >
-                  Supprimer
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-action btn-reset"
+                      onClick={() => setPrimaryPhoto(photo.id)}
+                      disabled={loading}
+                    >
+                      {photo.is_primary ? 'Principale' : 'Definir principale'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-action btn-delete"
+                      onClick={() => deletePhoto(photo.id)}
+                      disabled={loading}
+                    >
+                      Supprimer
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>
