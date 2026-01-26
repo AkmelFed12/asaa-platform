@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import apiClient from '../services/api';
+import axios from 'axios';
 import '../styles/MemberProfile.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -15,7 +15,11 @@ const MemberProfile = ({ user }) => {
       setLoading(true);
       setError('');
       try {
-        const response = await apiClient.get('/api/members');
+        const response = await axios.get(`${API_URL}/api/members`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
         setMembers(response.data?.data || []);
       } catch (loadError) {
         console.error('Error:', loadError);
