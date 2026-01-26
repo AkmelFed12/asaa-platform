@@ -33,6 +33,7 @@ const Admin = ({ isAdmin }) => {
   const [quizQuestionsLoading, setQuizQuestionsLoading] = useState(false);
   const [quizQuestionsError, setQuizQuestionsError] = useState('');
   const [quizQuestionsSearch, setQuizQuestionsSearch] = useState('');
+  const [quizQuestionsUnusedOnly, setQuizQuestionsUnusedOnly] = useState(true);
   const [dailyReplaceSelections, setDailyReplaceSelections] = useState({});
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
@@ -70,7 +71,7 @@ const Admin = ({ isAdmin }) => {
       loadDailyQuizAdmin();
       loadQuizQuestions(true);
     }
-  }, [isAdmin, adminView]);
+  }, [isAdmin, adminView, quizQuestionsUnusedOnly]);
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token') || ''}`
@@ -276,7 +277,8 @@ const Admin = ({ isAdmin }) => {
         params: {
           limit: 50,
           offset: nextOffset,
-          search: quizQuestionsSearch || undefined
+          search: quizQuestionsSearch || undefined,
+          unused: quizQuestionsUnusedOnly ? true : undefined
         }
       });
       const incoming = response.data?.questions || [];
@@ -982,6 +984,14 @@ const Admin = ({ isAdmin }) => {
                   value={quizQuestionsSearch}
                   onChange={(e) => setQuizQuestionsSearch(e.target.value)}
                 />
+                <label className="quiz-edit-filter">
+                  <input
+                    type="checkbox"
+                    checked={quizQuestionsUnusedOnly}
+                    onChange={(e) => setQuizQuestionsUnusedOnly(e.target.checked)}
+                  />
+                  Non utilisees uniquement
+                </label>
                 <button
                   type="button"
                   className="btn-create-user"

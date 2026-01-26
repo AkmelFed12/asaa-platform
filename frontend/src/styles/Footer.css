@@ -49,6 +49,21 @@
   color: #667eea;
 }
 
+.footer-link {
+  background: none;
+  border: none;
+  color: #bdc3c7;
+  cursor: pointer;
+  font-size: 0.95em;
+  padding: 0;
+  text-align: left;
+  transition: color 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #667eea;
+}
+
 .social-links {
   display: flex;
   gap: 15px;

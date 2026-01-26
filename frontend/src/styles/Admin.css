@@ -425,6 +425,18 @@
   flex-wrap: wrap;
 }
 
+.quiz-edit-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #555;
+  font-weight: 600;
+}
+
+.quiz-edit-filter input {
+  accent-color: #667eea;
+}
+
 .quiz-edit-actions input {
   padding: 10px 12px;
   border: 2px solid #ddd;

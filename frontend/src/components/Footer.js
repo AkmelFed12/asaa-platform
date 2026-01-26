@@ -1,7 +1,7 @@
 import React from 'react';
 import '../styles/Footer.css';
 
-const Footer = () => {
+const Footer = ({ onNavigate }) => {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -15,20 +15,52 @@ const Footer = () => {
         <div className="footer-section">
           <h4>Accès rapide</h4>
           <ul>
-            <li><a href="/">Accueil</a></li>
-            <li><a href="#quiz">Quiz</a></li>
-            <li><a href="#events">Événements</a></li>
-            <li><a href="#governance">Gouvernance</a></li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home')}>
+                Accueil
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('quiz')}>
+                Quiz
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('events')}>
+                Événements
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('governance')}>
+                Gouvernance
+              </button>
+            </li>
           </ul>
         </div>
 
         <div className="footer-section">
           <h4>À propos</h4>
           <ul>
-            <li><a href="#about">À propos de nous</a></li>
-            <li><a href="#contact">Contact</a></li>
-            <li><a href="#privacy">Politique de confidentialité</a></li>
-            <li><a href="#terms">Conditions d'utilisation</a></li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'about')}>
+                À propos de nous
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'contact')}>
+                Contact
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'privacy')}>
+                Politique de confidentialité
+              </button>
+            </li>
+            <li>
+              <button type="button" className="footer-link" onClick={() => onNavigate?.('home', 'terms')}>
+                Conditions d'utilisation
+              </button>
+            </li>
           </ul>
         </div>
 

@@ -41,6 +41,17 @@ function App() {
     return <Auth onLogin={handleLogin} />;
   }
 
+  const handleNavigate = (page, anchorId) => {
+    setCurrentPage(page);
+    if (!anchorId) return;
+    setTimeout(() => {
+      const target = document.getElementById(anchorId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 0);
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -123,6 +134,26 @@ function App() {
                 )}
               </div>
             </section>
+
+            <section className="status-section" id="about">
+              <h2>À propos de nous</h2>
+              <p>ASAA soutient la formation et l'organisation communautaire à travers des outils simples et efficaces.</p>
+            </section>
+
+            <section className="status-section" id="contact">
+              <h2>Contact</h2>
+              <p>Pour toute demande, contactez l'administration via votre responsable local.</p>
+            </section>
+
+            <section className="status-section" id="privacy">
+              <h2>Politique de confidentialité</h2>
+              <p>Nous protégeons les données des membres et n'utilisons pas vos informations à des fins commerciales.</p>
+            </section>
+
+            <section className="status-section" id="terms">
+              <h2>Conditions d'utilisation</h2>
+              <p>L'utilisation de la plateforme implique le respect des règles et la bonne conduite en communauté.</p>
+            </section>
           </>
         )}
 
@@ -147,7 +178,7 @@ function App() {
         )}
       </main>
 
-      <Footer />
+      <Footer onNavigate={handleNavigate} />
     </div>
   );
 }
