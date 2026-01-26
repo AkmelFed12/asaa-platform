@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../utils/db');
-const { sendEventNotification } = require('../utils/emailService');
+const { sendEventNotification, sendEventReminder } = require('../utils/emailService');
 const websocketManager = require('../utils/websocketManager');
 const { requireAdmin } = require('../middleware/auth');
 
@@ -91,6 +91,49 @@ router.get('/all', requireAdmin, async (req, res) => {
     );
     res.json({ data: rows, total: rows.length });
   } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/reminders/run', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, date, location, image
+       FROM events
+       WHERE reminder_sent = FALSE
+         AND date >= NOW()
+         AND date <= NOW() + INTERVAL '24 hours'
+       ORDER BY date ASC`
+    );
+
+    if (rows.length === 0) {
+      return res.json({ sent: 0, updated: 0 });
+    }
+
+    let sent = 0;
+    let updated = 0;
+    for (const eventItem of rows) {
+      const success = await sendEventReminder('ouattaral2@student.iugb.edu.ci', 'ASAA Members', {
+        title: eventItem.title,
+        description: eventItem.description,
+        date: eventItem.date,
+        location: eventItem.location,
+        image: eventItem.image
+      });
+
+      if (success) {
+        sent += 1;
+        await pool.query(
+          'UPDATE events SET reminder_sent = TRUE WHERE id = $1',
+          [eventItem.id]
+        );
+        updated += 1;
+      }
+    }
+
+    res.json({ sent, updated });
+  } catch (error) {
+    console.error('Event reminders error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

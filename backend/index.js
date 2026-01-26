@@ -48,6 +48,7 @@ app.use('/api/governance', require('./src/routes/governance'));
 app.use('/api/quiz', require('./src/routes/quiz'));
 app.use('/api/photos', require('./src/routes/photos'));
 app.use('/api/news', require('./src/routes/news'));
+app.use('/api/stats', require('./src/routes/stats'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

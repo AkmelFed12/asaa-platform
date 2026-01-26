@@ -80,10 +80,18 @@ const Admin = ({ isAdmin }) => {
   const [newsItems, setNewsItems] = useState([]);
   const [newsForm, setNewsForm] = useState({
     title: '',
-    content: ''
+    content: '',
+    is_published: true
   });
   const [newsEditingId, setNewsEditingId] = useState(null);
+  const [newsHistory, setNewsHistory] = useState([]);
+  const [newsHistoryLoading, setNewsHistoryLoading] = useState(false);
+  const [newsHistoryError, setNewsHistoryError] = useState('');
   const [userToasts, setUserToasts] = useState([]);
+  const [monthlyStats, setMonthlyStats] = useState([]);
+  const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
+  const [monthlyStatsError, setMonthlyStatsError] = useState('');
+  const [eventReminderLoading, setEventReminderLoading] = useState(false);
 
   useEffect(() => {
     if (isAdmin) {
@@ -103,6 +111,19 @@ const Admin = ({ isAdmin }) => {
       loadQuizLeaderboard();
     }
   }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
+
+  useEffect(() => {
+    if (isAdmin && adminView === 'news') {
+      loadNews();
+      loadNewsHistory();
+    }
+  }, [isAdmin, adminView]);
+
+  useEffect(() => {
+    if (isAdmin && adminView === 'stats') {
+      loadMonthlyStats();
+    }
+  }, [isAdmin, adminView]);
 
   useEffect(() => {
     dailyQuizQuestionsRef.current = dailyQuizQuestions;
@@ -332,6 +353,56 @@ const Admin = ({ isAdmin }) => {
     autoSaveTimerRef.current.order = setTimeout(() => {
       saveDailyQuizOrder(dailyQuizQuestionsRef.current);
     }, 600);
+  };
+
+  const exportDailyQuizPdf = () => {
+    const questions = dailyQuizQuestionsRef.current;
+    if (!questions.length) {
+      pushToast('Aucune question a exporter.', 'error');
+      return;
+    }
+    const quizDateLabel = dailyQuizDate || new Date().toISOString().split('T')[0];
+    const html = `
+      <!doctype html>
+      <html lang="fr">
+        <head>
+          <meta charset="utf-8" />
+          <title>Quiz du jour</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
+            h1 { margin: 0 0 8px; }
+            .meta { margin-bottom: 20px; color: #555; }
+            .question { margin-bottom: 18px; }
+            .question h3 { margin: 0 0 6px; font-size: 16px; }
+            .question ul { margin: 0; padding-left: 18px; }
+            .question li { margin: 4px 0; }
+          </style>
+        </head>
+        <body>
+          <h1>Quiz du jour</h1>
+          <div class="meta">Date: ${quizDateLabel}</div>
+          ${questions.map((question, index) => `
+            <div class="question">
+              <h3>${index + 1}. ${question.question}</h3>
+              <ul>
+                ${(question.options || []).map((option) => `<li>${option}</li>`).join('')}
+              </ul>
+            </div>
+          `).join('')}
+        </body>
+      </html>
+    `;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      pushToast('Popup bloquee. Autorisez l ouverture du PDF.', 'error');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   const loadQuizQuestions = async (reset = false) => {
@@ -616,10 +687,63 @@ const Admin = ({ isAdmin }) => {
 
   const loadNews = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/news`);
+      const response = await axios.get(`${API_URL}/api/news/admin`, {
+        headers: getAuthHeaders()
+      });
       setNewsItems(response.data?.data || []);
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const loadNewsHistory = async () => {
+    setNewsHistoryLoading(true);
+    setNewsHistoryError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/news/history`, {
+        headers: getAuthHeaders()
+      });
+      setNewsHistory(response.data?.data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      setNewsHistoryError('Impossible de charger l historique.');
+      setNewsHistory([]);
+    } finally {
+      setNewsHistoryLoading(false);
+    }
+  };
+
+  const loadMonthlyStats = async () => {
+    setMonthlyStatsLoading(true);
+    setMonthlyStatsError('');
+    try {
+      const response = await axios.get(`${API_URL}/api/stats/monthly`, {
+        headers: getAuthHeaders(),
+        params: { months: 6 }
+      });
+      setMonthlyStats(response.data?.data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      setMonthlyStatsError('Impossible de charger les statistiques mensuelles.');
+      setMonthlyStats([]);
+    } finally {
+      setMonthlyStatsLoading(false);
+    }
+  };
+
+  const runEventReminders = async () => {
+    setEventReminderLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/events/reminders/run`, {}, {
+        headers: getAuthHeaders()
+      });
+      const sent = response.data?.sent || 0;
+      pushToast(`Rappels envoyes: ${sent}.`, 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors des rappels.', 'error');
+    } finally {
+      setEventReminderLoading(false);
     }
   };
 
@@ -637,13 +761,14 @@ const Admin = ({ isAdmin }) => {
     try {
       const response = await axios.post(`${API_URL}/api/news`, {
         title: newsForm.title.trim(),
-        content: newsForm.content.trim()
+        content: newsForm.content.trim(),
+        is_published: newsForm.is_published
       }, {
         headers: getAuthHeaders()
       });
       setNewsItems((prev) => [response.data?.data, ...prev].filter(Boolean));
-      setNewsForm({ title: '', content: '' });
-      pushToast('Actualite publiee.', 'success');
+      setNewsForm({ title: '', content: '', is_published: true });
+      pushToast(newsForm.is_published ? 'Actualite publiee.' : 'Brouillon enregistre.', 'success');
     } catch (error) {
       console.error('Error:', error);
       pushToast('Erreur lors de la publication.', 'error');
@@ -654,15 +779,34 @@ const Admin = ({ isAdmin }) => {
     try {
       const response = await axios.put(`${API_URL}/api/news/${id}`, {
         title: newsForm.title.trim(),
-        content: newsForm.content.trim()
+        content: newsForm.content.trim(),
+        is_published: newsForm.is_published
       }, {
         headers: getAuthHeaders()
       });
       const updated = response.data?.data;
       setNewsItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
-      setNewsForm({ title: '', content: '' });
+      setNewsForm({ title: '', content: '', is_published: true });
       setNewsEditingId(null);
       pushToast('Actualite mise a jour.', 'success');
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Erreur lors de la mise a jour.', 'error');
+    }
+  };
+
+  const handleTogglePublish = async (item) => {
+    try {
+      const response = await axios.put(`${API_URL}/api/news/${item.id}`, {
+        title: item.title,
+        content: item.content,
+        is_published: !item.is_published
+      }, {
+        headers: getAuthHeaders()
+      });
+      const updated = response.data?.data;
+      setNewsItems((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
+      pushToast(updated?.is_published ? 'Actualite publiee.' : 'Actualite en brouillon.', 'success');
     } catch (error) {
       console.error('Error:', error);
       pushToast('Erreur lors de la mise a jour.', 'error');
@@ -951,6 +1095,12 @@ const Admin = ({ isAdmin }) => {
           📋 Journaux
         </button>
         <button
+          className={`admin-tab ${adminView === 'stats' ? 'active' : ''}`}
+          onClick={() => setAdminView('stats')}
+        >
+          📊 Statistiques
+        </button>
+        <button
           className={`admin-tab ${adminView === 'quiz' ? 'active' : ''}`}
           onClick={() => setAdminView('quiz')}
         >
@@ -1141,6 +1291,50 @@ const Admin = ({ isAdmin }) => {
         </div>
       )}
 
+      {adminView === 'stats' && (
+        <div className="admin-section">
+          <div className="section-header">
+            <h3>📊 Statistiques mensuelles (6 derniers mois)</h3>
+            <button
+              type="button"
+              className="btn-create-user"
+              onClick={loadMonthlyStats}
+              disabled={monthlyStatsLoading}
+            >
+              {monthlyStatsLoading ? 'Chargement...' : 'Rafraichir'}
+            </button>
+          </div>
+          {monthlyStatsError && <p className="quiz-daily-error">{monthlyStatsError}</p>}
+          {!monthlyStatsError && monthlyStats.length === 0 && !monthlyStatsLoading && (
+            <p>Aucune statistique disponible.</p>
+          )}
+          {monthlyStats.length > 0 && (
+            <div className="users-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mois</th>
+                    <th>Nouveaux utilisateurs</th>
+                    <th>Evenements crees</th>
+                    <th>Quiz completes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyStats.map((row) => (
+                    <tr key={row.month}>
+                      <td>{row.month}</td>
+                      <td>{row.members}</td>
+                      <td>{row.events}</td>
+                      <td>{row.quiz_attempts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {adminView === 'quiz' && (
         <div className="admin-section">
           <h3>📚 Ajouter une question</h3>
@@ -1213,6 +1407,14 @@ const Admin = ({ isAdmin }) => {
                   disabled={quizCleanupLoading}
                 >
                   {quizCleanupLoading ? 'Nettoyage...' : 'Nettoyer les questions utilisees'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-create-user"
+                  onClick={exportDailyQuizPdf}
+                  disabled={dailyQuizQuestions.length === 0}
+                >
+                  Exporter PDF
                 </button>
                 <button
                   type="button"
@@ -1729,6 +1931,17 @@ const Admin = ({ isAdmin }) => {
       {adminView === 'events' && (
         <div className="admin-section">
           <h3>📅 Gestion des événements</h3>
+          <div className="event-reminder-actions">
+            <p>Envoyer les rappels J-1 pour les evenements a venir.</p>
+            <button
+              type="button"
+              className="btn-create-user"
+              onClick={runEventReminders}
+              disabled={eventReminderLoading}
+            >
+              {eventReminderLoading ? 'Envoi...' : 'Envoyer les rappels J-1'}
+            </button>
+          </div>
           <form className="user-form" onSubmit={handleCreateEvent}>
             <input
               type="text"
@@ -1913,8 +2126,16 @@ const Admin = ({ isAdmin }) => {
               onChange={(e) => setNewsForm((prev) => ({ ...prev, content: e.target.value }))}
               required
             />
+            <label className="news-status-toggle">
+              <input
+                type="checkbox"
+                checked={newsForm.is_published}
+                onChange={(e) => setNewsForm((prev) => ({ ...prev, is_published: e.target.checked }))}
+              />
+              Publier maintenant
+            </label>
             <button type="submit" className="btn-submit">
-              {newsEditingId ? 'Mettre a jour' : 'Publier'}
+              {newsEditingId ? 'Mettre a jour' : newsForm.is_published ? 'Publier' : 'Enregistrer brouillon'}
             </button>
             {newsEditingId && (
               <button
@@ -1922,7 +2143,7 @@ const Admin = ({ isAdmin }) => {
                 className="btn-action btn-reset"
                 onClick={() => {
                   setNewsEditingId(null);
-                  setNewsForm({ title: '', content: '' });
+                  setNewsForm({ title: '', content: '', is_published: true });
                 }}
               >
                 Annuler
@@ -1938,6 +2159,9 @@ const Admin = ({ isAdmin }) => {
                   <h4>{item.title}</h4>
                   <p>{item.content}</p>
                   <span>{new Date(item.created_at || item.createdAt).toLocaleDateString('fr-FR')}</span>
+                  <span className={`news-status ${item.is_published ? 'published' : 'draft'}`}>
+                    {item.is_published ? 'Publie' : 'Brouillon'}
+                  </span>
                 </div>
                 <div className="admin-news-actions">
                   <button
@@ -1945,10 +2169,21 @@ const Admin = ({ isAdmin }) => {
                     className="btn-action btn-reset"
                     onClick={() => {
                       setNewsEditingId(item.id);
-                      setNewsForm({ title: item.title, content: item.content });
+                      setNewsForm({
+                        title: item.title,
+                        content: item.content,
+                        is_published: item.is_published !== false
+                      });
                     }}
                   >
                     Modifier
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-action btn-reset"
+                    onClick={() => handleTogglePublish(item)}
+                  >
+                    {item.is_published ? 'Passer brouillon' : 'Publier'}
                   </button>
                   <button
                     type="button"
@@ -1967,6 +2202,35 @@ const Admin = ({ isAdmin }) => {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="news-history-section">
+            <div className="section-header">
+              <h3>Historique des actualites</h3>
+              <button
+                type="button"
+                className="btn-create-user"
+                onClick={loadNewsHistory}
+                disabled={newsHistoryLoading}
+              >
+                {newsHistoryLoading ? 'Chargement...' : 'Rafraichir'}
+              </button>
+            </div>
+            {newsHistoryError && <p className="quiz-daily-error">{newsHistoryError}</p>}
+            {!newsHistoryError && newsHistory.length === 0 && !newsHistoryLoading && (
+              <p>Aucun historique disponible.</p>
+            )}
+            {newsHistory.length > 0 && (
+              <div className="news-history-list">
+                {newsHistory.map((entry) => (
+                  <div key={entry.id} className="news-history-item">
+                    <div>
+                      <strong>{entry.action}</strong> - {entry.title}
+                    </div>
+                    <span>{new Date(entry.created_at).toLocaleString('fr-FR')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

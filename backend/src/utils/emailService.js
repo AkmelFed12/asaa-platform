@@ -198,6 +198,69 @@ const sendEventNotification = async (userEmail, userName, eventData) => {
 };
 
 /**
+ * Envoyer email de rappel d'evenement (J-1)
+ */
+const sendEventReminder = async (userEmail, userName, eventData) => {
+  try {
+    const eventDate = new Date(eventData.date).toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'ASAA Platform <notifications@asaa.com>',
+      to: userEmail,
+      subject: `⏰ Rappel evenement ASAA: ${eventData.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
+            <h1 style="margin: 0; font-size: 2em;">⏰ Rappel d'Evenement</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Dans moins de 24 heures</p>
+          </div>
+
+          <div style="padding: 30px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;">
+            <h2 style="color: #333; margin-top: 0;">${eventData.title}</h2>
+
+            ${eventData.image ? `<img src="${eventData.image}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin: 20px 0;" alt="${eventData.title}">` : ''}
+
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f39c12;">
+              <p style="margin: 5px 0;"><strong>📅 Date:</strong> ${eventDate}</p>
+              <p style="margin: 5px 0;"><strong>📍 Lieu:</strong> ${eventData.location}</p>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #333; margin-top: 0;">Description</h3>
+              <p style="color: #666; line-height: 1.6;">${eventData.description}</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.APP_URL}/events" style="display: inline-block; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: 600;">
+                Voir l'Evenement
+              </a>
+            </div>
+          </div>
+
+          <div style="text-align: center; color: #999; font-size: 0.85em; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p>© 2026 LMO CORP - La formation est notre priorité</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Email de rappel envoyé à ${userEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Erreur envoi email rappel: ${error.message}`);
+    return false;
+  }
+};
+
+/**
  * Helper: Obtenir la couleur par niveau
  */
 function getLevelColor(level) {
@@ -213,5 +276,6 @@ function getLevelColor(level) {
 module.exports = {
   sendQuizNotification,
   sendWelcomeEmail,
-  sendEventNotification
+  sendEventNotification,
+  sendEventReminder
 };

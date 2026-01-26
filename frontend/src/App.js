@@ -12,6 +12,7 @@ import Footer from './components/Footer';
 function App() {
   const [user, setUser] = useState(null);
   const [currentPage, setCurrentPage] = useState('home');
+  const [newsItems, setNewsItems] = useState([]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -36,11 +37,6 @@ function App() {
     setCurrentPage('home');
   };
 
-  // Show authentication page if not logged in
-  if (!user) {
-    return <Auth onLogin={handleLogin} />;
-  }
-
   const handleNavigate = (page, anchorId) => {
     setCurrentPage(page);
     if (!anchorId) return;
@@ -51,8 +47,6 @@ function App() {
       }
     }, 0);
   };
-
-  const [newsItems, setNewsItems] = useState([]);
 
   useEffect(() => {
     const loadNews = async () => {
@@ -77,6 +71,11 @@ function App() {
     };
     loadNews();
   }, []);
+
+  // Show authentication page if not logged in
+  if (!user) {
+    return <Auth onLogin={handleLogin} />;
+  }
 
   return (
     <div className="App">
