@@ -45,4 +45,22 @@ router.get('/monthly', requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/summary', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM users) AS total_users,
+         (SELECT COUNT(*)::int FROM members) AS total_members,
+         (SELECT COUNT(*)::int FROM events) AS total_events,
+         (SELECT COUNT(*)::int FROM events WHERE date >= NOW()) AS upcoming_events,
+         (SELECT COUNT(*)::int FROM daily_quiz_attempts
+          WHERE completed_at IS NOT NULL
+            AND completed_at::date = CURRENT_DATE) AS quiz_completed_today`
+    );
+    res.json({ data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;

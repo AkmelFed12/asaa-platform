@@ -20,6 +20,7 @@ const Events = ({ isAdmin }) => {
   const [showForm, setShowForm] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [eventPhotoPreview, setEventPhotoPreview] = useState('');
+  const [eventPhotoUrl, setEventPhotoUrl] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -64,6 +65,7 @@ const Events = ({ isAdmin }) => {
         image: ''
       });
       setEventPhotoPreview('');
+      setEventPhotoUrl('');
       setShowForm(false);
       loadEvents();
     } catch (error) {
@@ -89,9 +91,12 @@ const Events = ({ isAdmin }) => {
 
   const handleEventPhotoUpload = (data) => {
     const photo = Array.isArray(data) ? data[0] : data;
-    if (!photo?.url) return;
-    setFormData((prev) => ({ ...prev, image: photo.url }));
-    setEventPhotoPreview(photo.url);
+    if (!photo) return;
+    setEventPhotoUrl(photo.url || '');
+    setEventPhotoPreview(photo.dataUrl || photo.url || '');
+    if (photo.url) {
+      setFormData((prev) => ({ ...prev, image: photo.url }));
+    }
   };
 
   const escapeHtml = (value) => (
@@ -316,6 +321,15 @@ const Events = ({ isAdmin }) => {
                 <div className="event-upload-preview">
                   <img src={normalizeImageUrl(eventPhotoPreview)} alt="Aperçu" />
                 </div>
+              )}
+              {eventPhotoUrl && (
+                <button
+                  type="button"
+                  className="btn-submit"
+                  onClick={() => setFormData((prev) => ({ ...prev, image: eventPhotoUrl }))}
+                >
+                  Enregistrer la photo
+                </button>
               )}
               <button type="submit" className="btn-submit">Créer l'événement</button>
             </form>

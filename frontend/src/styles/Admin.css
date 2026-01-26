@@ -783,6 +783,21 @@
   max-width: 360px;
 }
 
+.member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.member-actions input {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  min-width: 240px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .admin-header h2 {

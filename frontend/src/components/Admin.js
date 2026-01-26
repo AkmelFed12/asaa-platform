@@ -59,6 +59,7 @@ const Admin = ({ isAdmin }) => {
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
   const [memberUploadId, setMemberUploadId] = useState(null);
+  const [memberSearch, setMemberSearch] = useState('');
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -67,6 +68,7 @@ const Admin = ({ isAdmin }) => {
     image: ''
   });
   const [eventPhotoPreview, setEventPhotoPreview] = useState('');
+  const [eventPhotoUrl, setEventPhotoUrl] = useState('');
   const [eventUploadId, setEventUploadId] = useState(null);
   const [quizCleanupLoading, setQuizCleanupLoading] = useState(false);
   const [events, setEvents] = useState([]);
@@ -74,8 +76,11 @@ const Admin = ({ isAdmin }) => {
   const [photoSearchResults, setPhotoSearchResults] = useState([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
+    totalMembers: 0,
     totalEvents: 0,
+    upcomingEvents: 0,
     totalQuizAttempts: 0,
+    quizCompletedToday: 0,
     topScores: []
   });
   const [newsItems, setNewsItems] = useState([]);
@@ -97,6 +102,7 @@ const Admin = ({ isAdmin }) => {
   useEffect(() => {
     if (isAdmin) {
       loadData();
+      loadSummaryStats();
       loadMembers();
       loadEvents();
       loadNews();
@@ -153,6 +159,13 @@ const Admin = ({ isAdmin }) => {
     return url;
   };
 
+  const buildWhatsappLink = (phone) => {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const normalized = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
+    return `https://wa.me/${normalized}`;
+  };
+
   const pushUserToast = (message, type = 'info') => {
     const id = `${Date.now()}-${Math.random()}`;
     setUserToasts((prev) => [...prev, { id, message, type }]);
@@ -170,8 +183,11 @@ const Admin = ({ isAdmin }) => {
       setUsers(usersList);
       setStats({
         totalUsers: usersList.length,
+        totalMembers: 0,
         totalEvents: 0,
+        upcomingEvents: 0,
         totalQuizAttempts: 0,
+        quizCompletedToday: 0,
         topScores: []
       });
     } catch (error) {
@@ -179,10 +195,34 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
-  const loadMembers = async () => {
+  const loadSummaryStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/members`, {
+      const response = await axios.get(`${API_URL}/api/stats/summary`, {
         headers: getAuthHeaders()
+      });
+      const summary = response.data?.data;
+      if (!summary) return;
+      setStats((prev) => ({
+        ...prev,
+        totalUsers: summary.total_users,
+        totalMembers: summary.total_members,
+        totalEvents: summary.total_events,
+        upcomingEvents: summary.upcoming_events,
+        quizCompletedToday: summary.quiz_completed_today
+      }));
+    } catch (error) {
+      console.error('Error loading summary stats:', error);
+    }
+  };
+
+  const loadMembers = async (searchOverride) => {
+    try {
+      const searchValue = searchOverride !== undefined ? searchOverride : memberSearch;
+      const response = await axios.get(`${API_URL}/api/members`, {
+        headers: getAuthHeaders(),
+        params: {
+          search: searchValue || undefined
+        }
       });
       setMembers(response.data?.data || []);
     } catch (error) {
@@ -636,6 +676,7 @@ const Admin = ({ isAdmin }) => {
         image: ''
       });
       setEventPhotoPreview('');
+      setEventPhotoUrl('');
       loadEvents();
     } catch (error) {
       console.error('Error:', error);
@@ -878,11 +919,71 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const exportMembersPdf = () => {
+    const rows = members.map((member) => {
+      const photoUrl = normalizePhotoUrl(member.photo_url);
+      return `
+        <tr>
+          <td>${member.member_number || ''}</td>
+          <td>${member.first_name || ''} ${member.last_name || ''}</td>
+          <td>${member.phone || ''}</td>
+          <td>${member.city || ''}</td>
+          <td>${member.email || ''}</td>
+          <td>
+            ${photoUrl ? `<img src="${photoUrl}" alt="photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px;" />` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Membres ASAA</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+            h1 { margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Liste des membres</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Numero</th>
+                <th>Nom</th>
+                <th>Telephone</th>
+                <th>Ville</th>
+                <th>Email</th>
+                <th>Photo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="6">Aucun membre</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   const handleEventPhotoUpload = (data) => {
     const photo = Array.isArray(data) ? data[0] : data;
-    if (!photo?.url) return;
-    setEventForm((prev) => ({ ...prev, image: photo.url }));
-    setEventPhotoPreview(photo.url);
+    if (!photo) return;
+    setEventPhotoUrl(photo.url || '');
+    setEventPhotoPreview(photo.dataUrl || photo.url || '');
+    if (photo.url) {
+      setEventForm((prev) => ({ ...prev, image: photo.url }));
+    }
   };
 
   const handleEventRowPhotoUpload = async (eventId, data) => {
@@ -1067,12 +1168,24 @@ const Admin = ({ isAdmin }) => {
           <p>Utilisateurs</p>
         </div>
         <div className="stat-card">
+          <h3>{stats.totalMembers}</h3>
+          <p>Membres</p>
+        </div>
+        <div className="stat-card">
           <h3>{stats.totalEvents}</h3>
           <p>Événements</p>
         </div>
         <div className="stat-card">
+          <h3>{stats.upcomingEvents}</h3>
+          <p>Événements à venir</p>
+        </div>
+        <div className="stat-card">
           <h3>{stats.totalQuizAttempts}</h3>
           <p>Quiz complétés</p>
+        </div>
+        <div className="stat-card">
+          <h3>{stats.quizCompletedToday}</h3>
+          <p>Quiz aujourd'hui</p>
         </div>
       </div>
 
@@ -1811,13 +1924,45 @@ const Admin = ({ isAdmin }) => {
       {adminView === 'members' && (
         <div className="admin-section">
           <h3>👥 Gestion des membres</h3>
-          <button
-            className="btn-create-user"
-            onClick={exportMembersCsv}
-            type="button"
-          >
-            ⬇️ Export CSV
-          </button>
+          <div className="member-actions">
+            <input
+              type="text"
+              placeholder="Recherche (nom, email, numero, telephone)"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+            />
+            <button
+              className="btn-create-user"
+              onClick={loadMembers}
+              type="button"
+            >
+              Rechercher
+            </button>
+            <button
+              className="btn-create-user"
+              onClick={() => {
+                setMemberSearch('');
+                loadMembers('');
+              }}
+              type="button"
+            >
+              Reinitialiser
+            </button>
+            <button
+              className="btn-create-user"
+              onClick={exportMembersCsv}
+              type="button"
+            >
+              ⬇️ Export CSV
+            </button>
+            <button
+              className="btn-create-user"
+              onClick={exportMembersPdf}
+              type="button"
+            >
+              ⬇️ Export PDF
+            </button>
+          </div>
           <div className="users-table">
             <table>
               <thead>
@@ -1849,6 +1994,16 @@ const Admin = ({ isAdmin }) => {
                           [member.id]: { ...prev[member.id], phone: e.target.value }
                         }))}
                       />
+                      {(memberEdit[member.id]?.phone ?? member.phone) && (
+                        <a
+                          className="whatsapp-link"
+                          href={buildWhatsappLink(memberEdit[member.id]?.phone ?? member.phone)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          WhatsApp
+                        </a>
+                      )}
                     </td>
                     <td>
                       <input
@@ -2015,6 +2170,15 @@ const Admin = ({ isAdmin }) => {
                 <div className="event-photo-preview">
                   <img src={normalizePhotoUrl(eventPhotoPreview)} alt="Aperçu" />
                 </div>
+              )}
+              {eventPhotoUrl && (
+                <button
+                  type="button"
+                  className="btn-submit"
+                  onClick={() => setEventForm((prev) => ({ ...prev, image: eventPhotoUrl }))}
+                >
+                  Enregistrer la photo
+                </button>
               )}
             </div>
             <button type="submit" className="btn-submit">Créer l'événement</button>

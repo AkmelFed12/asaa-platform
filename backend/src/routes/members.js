@@ -5,13 +5,38 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT m.id, m.member_number, m.date_of_birth, m.city, m.phone, m.created_at,
-              u.id AS user_id, u.email, u.first_name, u.last_name, u.role
-       FROM members m
-       JOIN users u ON u.id = m.user_id
-       ORDER BY m.created_at DESC`
-    );
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const params = [];
+    let query = `
+      SELECT m.id, m.member_number, m.date_of_birth, m.city, m.phone, m.created_at,
+             u.id AS user_id, u.email, u.first_name, u.last_name, u.role,
+             photo.photo_url
+      FROM members m
+      JOIN users u ON u.id = m.user_id
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(data_url, url) AS photo_url
+        FROM member_photos
+        WHERE member_id = m.id
+        ORDER BY uploaded_at DESC
+        LIMIT 1
+      ) photo ON true
+    `;
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += `
+        WHERE u.first_name ILIKE $1
+           OR u.last_name ILIKE $1
+           OR u.email ILIKE $1
+           OR m.member_number ILIKE $1
+           OR m.phone ILIKE $1
+           OR m.city ILIKE $1
+      `;
+    }
+
+    query += ' ORDER BY m.created_at DESC';
+
+    const { rows } = await pool.query(query, params);
     res.json({ data: rows, total: rows.length });
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
