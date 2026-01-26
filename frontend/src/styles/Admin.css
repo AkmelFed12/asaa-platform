@@ -395,6 +395,26 @@
   font-size: 0.9em;
 }
 
+.quiz-daily-replace {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quiz-daily-replace select {
+  padding: 8px 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.quiz-daily-replace-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .quiz-edit-section {
   margin-top: 30px;
 }

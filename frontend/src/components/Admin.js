@@ -33,6 +33,7 @@ const Admin = ({ isAdmin }) => {
   const [quizQuestionsLoading, setQuizQuestionsLoading] = useState(false);
   const [quizQuestionsError, setQuizQuestionsError] = useState('');
   const [quizQuestionsSearch, setQuizQuestionsSearch] = useState('');
+  const [dailyReplaceSelections, setDailyReplaceSelections] = useState({});
   const [memberPhotoMemberId, setMemberPhotoMemberId] = useState('');
   const [memberPhotos, setMemberPhotos] = useState([]);
   const [memberEdit, setMemberEdit] = useState({});
@@ -494,11 +495,9 @@ const Admin = ({ isAdmin }) => {
   };
 
   const replaceDailyQuestion = async (position) => {
-    const input = window.prompt('Entrez l’ID de la nouvelle question :');
-    if (!input) return;
-    const newQuestionId = Number(input);
-    if (Number.isNaN(newQuestionId)) {
-      setDailyQuizError('ID de question invalide.');
+    const newQuestionId = dailyReplaceSelections[position];
+    if (!newQuestionId) {
+      setDailyQuizError('Selectionnez une question pour le remplacement.');
       return;
     }
     setDailyQuizSaving(true);
@@ -519,6 +518,22 @@ const Admin = ({ isAdmin }) => {
     } finally {
       setDailyQuizSaving(false);
     }
+  };
+
+  const replaceDailyQuestionRandom = async (position) => {
+    if (!quizQuestions.length) {
+      setDailyQuizError('Chargez les questions disponibles avant de remplacer.');
+      return;
+    }
+    const dailyIds = new Set(dailyQuizQuestions.map((item) => item.id));
+    const candidates = quizQuestions.filter((item) => !dailyIds.has(item.id));
+    if (!candidates.length) {
+      setDailyQuizError('Aucune question disponible pour le remplacement.');
+      return;
+    }
+    const random = candidates[Math.floor(Math.random() * candidates.length)];
+    setDailyReplaceSelections((prev) => ({ ...prev, [position]: random.id }));
+    await replaceDailyQuestion(position);
   };
 
   const handleCleanupUsedQuestions = async () => {
@@ -891,13 +906,42 @@ const Admin = ({ isAdmin }) => {
                       <p className="quiz-daily-question">{question.question}</p>
                       <p className="quiz-daily-meta">ID: {question.id}</p>
                       <p className="quiz-daily-difficulty">Niveau: {question.difficulty}</p>
-                      <button
-                        type="button"
-                        className="btn-action btn-reset"
-                        onClick={() => replaceDailyQuestion(question.position)}
-                      >
-                        Changer la question
-                      </button>
+                      <div className="quiz-daily-replace">
+                        <select
+                          value={dailyReplaceSelections[question.position] || ''}
+                          onChange={(e) =>
+                            setDailyReplaceSelections((prev) => ({
+                              ...prev,
+                              [question.position]: Number(e.target.value)
+                            }))
+                          }
+                        >
+                          <option value="">Choisir une autre question</option>
+                          {quizQuestions
+                            .filter((item) => item.id !== question.id)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.id} - {item.question}
+                              </option>
+                            ))}
+                        </select>
+                        <div className="quiz-daily-replace-actions">
+                          <button
+                            type="button"
+                            className="btn-action btn-reset"
+                            onClick={() => replaceDailyQuestion(question.position)}
+                          >
+                            Remplacer
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-action btn-reset"
+                            onClick={() => replaceDailyQuestionRandom(question.position)}
+                          >
+                            Remplacer (aleatoire)
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
