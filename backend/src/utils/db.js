@@ -26,10 +26,61 @@ async function initializeSchema() {
         options JSONB NOT NULL,
         correct_index INTEGER NOT NULL,
         difficulty TEXT NOT NULL,
+        source TEXT,
+        tags TEXT[],
+        status TEXT,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         created_by TEXT NOT NULL DEFAULT 'seed',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE quiz_questions
+      ADD COLUMN IF NOT EXISTS source TEXT
+    `);
+    await client.query(`
+      ALTER TABLE quiz_questions
+      ADD COLUMN IF NOT EXISTS tags TEXT[]
+    `);
+    await client.query(`
+      ALTER TABLE quiz_questions
+      ADD COLUMN IF NOT EXISTS status TEXT
+    `);
+    await client.query(`
+      ALTER TABLE quiz_questions
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_questions_status_idx
+        ON quiz_questions (status)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_questions_tags_idx
+        ON quiz_questions USING GIN (tags)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS quiz_question_versions (
+        id BIGSERIAL PRIMARY KEY,
+        question_id BIGINT NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+        question_text TEXT NOT NULL,
+        options JSONB NOT NULL,
+        correct_index INTEGER NOT NULL,
+        difficulty TEXT NOT NULL,
+        source TEXT,
+        tags TEXT[],
+        status TEXT,
+        created_by TEXT,
+        change_type TEXT NOT NULL,
+        changed_by TEXT,
+        note TEXT,
+        changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_question_versions_question_id_idx
+        ON quiz_question_versions (question_id)
     `);
 
     await client.query(`
@@ -63,8 +114,21 @@ async function initializeSchema() {
       CREATE TABLE IF NOT EXISTS daily_quizzes (
         id BIGSERIAL PRIMARY KEY,
         quiz_date DATE NOT NULL UNIQUE,
+        quiz_level TEXT NOT NULL DEFAULT 'random',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE daily_quizzes
+      ADD COLUMN IF NOT EXISTS quiz_level TEXT NOT NULL DEFAULT 'random'
+    `);
+    await client.query(`
+      ALTER TABLE daily_quizzes
+      DROP CONSTRAINT IF EXISTS daily_quizzes_quiz_date_key
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS daily_quizzes_date_level_idx
+        ON daily_quizzes (quiz_date, quiz_level)
     `);
 
     await client.query(`
@@ -199,6 +263,72 @@ async function initializeSchema() {
     await client.query(`
       ALTER TABLE members
       ADD COLUMN IF NOT EXISTS phone TEXT
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS member_profile_extras (
+        user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        bio TEXT,
+        address TEXT,
+        emergency_name TEXT,
+        emergency_phone TEXT,
+        social_facebook TEXT,
+        social_instagram TEXT,
+        social_twitter TEXT,
+        social_linkedin TEXT,
+        notify_email BOOLEAN NOT NULL DEFAULT TRUE,
+        notify_whatsapp BOOLEAN NOT NULL DEFAULT TRUE,
+        visibility_directory BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS bio TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS address TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS emergency_name TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS emergency_phone TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS social_facebook TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS social_instagram TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS social_twitter TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS social_linkedin TEXT
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS notify_email BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS notify_whatsapp BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS visibility_directory BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    await client.query(`
+      ALTER TABLE member_profile_extras
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     `);
 
     await client.query(`

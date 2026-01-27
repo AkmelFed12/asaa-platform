@@ -517,6 +517,13 @@
   border-radius: 6px;
 }
 
+.quiz-edit-row select {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .quiz-edit-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -535,6 +542,37 @@
   padding: 10px 12px;
   border: 2px solid #ddd;
   border-radius: 6px;
+}
+
+.quiz-edit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.quiz-version-list {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.quiz-version-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quiz-version-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #444;
 }
 
 .quiz-history-section {
@@ -596,6 +634,20 @@
   background: #fff;
 }
 
+.quiz-import-replace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #2f4b36;
+}
+
+.quiz-import-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
 .auto-save-status {
   font-size: 0.85rem;
   color: #555;
@@ -638,6 +690,80 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 15px;
+}
+
+.quiz-quality-section {
+  margin: 20px 0;
+}
+
+.quiz-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.quality-card {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #667eea;
+}
+
+.quality-card h3 {
+  margin: 0 0 6px 0;
+  color: #667eea;
+}
+
+.quality-card p {
+  margin: 0;
+  color: #555;
+  font-weight: 600;
+}
+
+.quiz-quality-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.quiz-quality-list {
+  margin-top: 12px;
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #eee;
+}
+
+.quiz-quality-list h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.quality-items {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.quality-item p {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.quality-item span {
+  font-size: 0.85rem;
+  color: #666;
 }
 
 .quiz-low-warning {

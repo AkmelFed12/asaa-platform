@@ -20,7 +20,10 @@ const Admin = ({ isAdmin }) => {
     question: '',
     options: ['', '', '', ''],
     correctIndex: 0,
-    difficulty: 'easy'
+    difficulty: 'easy',
+    source: '',
+    tags: '',
+    status: 'draft'
   });
   const [dailyQuizQuestions, setDailyQuizQuestions] = useState([]);
   const [dailyQuizDate, setDailyQuizDate] = useState('');
@@ -35,6 +38,8 @@ const Admin = ({ isAdmin }) => {
   const [quizQuestionsSearch, setQuizQuestionsSearch] = useState('');
   const [quizQuestionsUnusedOnly, setQuizQuestionsUnusedOnly] = useState(true);
   const [quizQuestionsDifficulty, setQuizQuestionsDifficulty] = useState('');
+  const [quizQuestionsStatus, setQuizQuestionsStatus] = useState('');
+  const [quizQuestionsTags, setQuizQuestionsTags] = useState('');
   const [dailyReplaceSelections, setDailyReplaceSelections] = useState({});
   const [quizHistory, setQuizHistory] = useState([]);
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
@@ -49,6 +54,13 @@ const Admin = ({ isAdmin }) => {
   const [specialGenerating, setSpecialGenerating] = useState(false);
   const [quizImportFile, setQuizImportFile] = useState(null);
   const [quizImportLoading, setQuizImportLoading] = useState(false);
+  const [quizImportReplace, setQuizImportReplace] = useState(false);
+  const [quizQuality, setQuizQuality] = useState(null);
+  const [quizQualityLoading, setQuizQualityLoading] = useState(false);
+  const [quizQualityError, setQuizQualityError] = useState('');
+  const [questionVersions, setQuestionVersions] = useState({});
+  const [versionOpenId, setVersionOpenId] = useState(null);
+  const [versionLoadingId, setVersionLoadingId] = useState(null);
   const [autoSaveMap, setAutoSaveMap] = useState({});
   const [toasts, setToasts] = useState([]);
   const quizDailyRef = useRef(null);
@@ -116,8 +128,9 @@ const Admin = ({ isAdmin }) => {
       loadQuizHistory();
       loadQuizStats();
       loadQuizLeaderboard();
+      loadQuizQuality();
     }
-  }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty]);
+  }, [isAdmin, adminView, quizQuestionsUnusedOnly, quizQuestionsDifficulty, quizQuestionsStatus]);
 
   useEffect(() => {
     if (isAdmin && adminView === 'news') {
@@ -150,6 +163,34 @@ const Admin = ({ isAdmin }) => {
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 3500);
+  };
+  const parseTagsInput = (value) => {
+    if (!value) return [];
+    return String(value)
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  };
+
+  const formatTagsValue = (value) => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    return value || '';
+  };
+
+  const formatStatusLabel = (value) => {
+    if (!value) return 'Non defini';
+    if (value === 'draft') return 'Brouillon';
+    if (value === 'review') return 'A relire';
+    if (value === 'validated') return 'Validee';
+    if (value === 'archived') return 'Archivee';
+    return value;
+  };
+
+  const formatAccuracy = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '--';
+    return `${Math.round(Number(value) * 100)}%`;
   };
   const normalizePhotoUrl = (url) => {
     if (!url) return url;
@@ -313,7 +354,10 @@ const Admin = ({ isAdmin }) => {
         question: quizForm.question,
         options: quizForm.options,
         correctIndex: Number(quizForm.correctIndex),
-        difficulty: quizForm.difficulty
+        difficulty: quizForm.difficulty,
+        source: quizForm.source,
+        tags: parseTagsInput(quizForm.tags),
+        status: quizForm.status
       }, {
         headers: getAuthHeaders()
       });
@@ -322,9 +366,13 @@ const Admin = ({ isAdmin }) => {
         question: '',
         options: ['', '', '', ''],
         correctIndex: 0,
-        difficulty: 'easy'
+        difficulty: 'easy',
+        source: '',
+        tags: '',
+        status: 'draft'
       });
       loadQuizQuestions(true);
+      loadQuizQuality();
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de la création de la question');
@@ -459,11 +507,20 @@ const Admin = ({ isAdmin }) => {
           offset: nextOffset,
           search: quizQuestionsSearch || undefined,
           unused: quizQuestionsUnusedOnly ? true : undefined,
-          difficulty: quizQuestionsDifficulty || undefined
+          difficulty: quizQuestionsDifficulty || undefined,
+          status: quizQuestionsStatus || undefined,
+          tags: quizQuestionsTags || undefined
         }
       });
       const incoming = response.data?.questions || [];
-      setQuizQuestions((prev) => (reset ? incoming : [...prev, ...incoming]));
+      const normalized = incoming.map((item) => ({
+        ...item,
+        source: item.source || '',
+        tags: formatTagsValue(item.tags),
+        status: item.status || '',
+        updatedAt: item.updatedAt || item.updated_at
+      }));
+      setQuizQuestions((prev) => (reset ? normalized : [...prev, ...normalized]));
       setQuizQuestionsOffset(nextOffset + incoming.length);
       setQuizQuestionsHasMore(Boolean(response.data?.hasMore));
     } catch (error) {
@@ -482,10 +539,18 @@ const Admin = ({ isAdmin }) => {
           limit: 200,
           offset: 0,
           unused: true,
-          difficulty: replaceHardOnly ? 'hard' : quizQuestionsDifficulty || undefined
+          difficulty: replaceHardOnly ? 'hard' : quizQuestionsDifficulty || undefined,
+          status: 'validated,legacy'
         }
       });
-      return response.data?.questions || [];
+      const incoming = response.data?.questions || [];
+      return incoming.map((item) => ({
+        ...item,
+        source: item.source || '',
+        tags: formatTagsValue(item.tags),
+        status: item.status || '',
+        updatedAt: item.updatedAt || item.updated_at
+      }));
     } catch (error) {
       console.error('Error:', error);
       return [];
@@ -524,6 +589,23 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const loadQuizQuality = async () => {
+    setQuizQualityError('');
+    setQuizQualityLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/admin/quality`, {
+        headers: getAuthHeaders()
+      });
+      setQuizQuality(response.data || null);
+    } catch (error) {
+      console.error('Error:', error);
+      setQuizQualityError('Impossible de charger la qualite.');
+      setQuizQuality(null);
+    } finally {
+      setQuizQualityLoading(false);
+    }
+  };
+
   const loadQuizLeaderboard = async () => {
     setQuizLeaderboardError('');
     try {
@@ -536,12 +618,50 @@ const Admin = ({ isAdmin }) => {
     }
   };
 
+  const loadQuestionVersions = async (questionId) => {
+    setVersionLoadingId(questionId);
+    try {
+      const response = await axios.get(`${API_URL}/api/quiz/questions/${questionId}/versions`, {
+        headers: getAuthHeaders()
+      });
+      setQuestionVersions((prev) => ({
+        ...prev,
+        [questionId]: response.data?.versions || []
+      }));
+    } catch (error) {
+      console.error('Error:', error);
+      pushToast('Impossible de charger l historique.', 'error');
+    } finally {
+      setVersionLoadingId(null);
+    }
+  };
+
+  const toggleQuestionVersions = async (questionId) => {
+    if (versionOpenId === questionId) {
+      setVersionOpenId(null);
+      return;
+    }
+    setVersionOpenId(questionId);
+    if (!questionVersions[questionId]) {
+      await loadQuestionVersions(questionId);
+    }
+  };
+
   const handleQuizQuestionChange = (id, field, value) => {
     setQuizQuestions((prev) =>
       prev.map((question) => {
         if (question.id !== id) return question;
         if (field === 'question') {
           return { ...question, question: value };
+        }
+        if (field === 'source') {
+          return { ...question, source: value };
+        }
+        if (field === 'tags') {
+          return { ...question, tags: value };
+        }
+        if (field === 'status') {
+          return { ...question, status: value };
         }
         if (field === 'difficulty') {
           return { ...question, difficulty: value };
@@ -567,7 +687,10 @@ const Admin = ({ isAdmin }) => {
         question: question.question,
         options: question.options,
         correctIndex: question.correctIndex,
-        difficulty: question.difficulty
+        difficulty: question.difficulty,
+        source: question.source,
+        tags: parseTagsInput(question.tags),
+        status: question.status
       }, {
         headers: getAuthHeaders()
       });
@@ -587,15 +710,18 @@ const Admin = ({ isAdmin }) => {
       const question = quizQuestionsRef.current.find((item) => item.id === questionId);
       if (!question) return;
       setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'saving' }));
-      try {
-        await axios.put(`${API_URL}/api/quiz/questions/${questionId}`, {
-          question: question.question,
-          options: question.options,
-          correctIndex: question.correctIndex,
-          difficulty: question.difficulty
-        }, {
-          headers: getAuthHeaders()
-        });
+        try {
+          await axios.put(`${API_URL}/api/quiz/questions/${questionId}`, {
+            question: question.question,
+            options: question.options,
+            correctIndex: question.correctIndex,
+            difficulty: question.difficulty,
+            source: question.source,
+            tags: parseTagsInput(question.tags),
+            status: question.status
+          }, {
+            headers: getAuthHeaders()
+          });
         setAutoSaveMap((prev) => ({ ...prev, [questionId]: 'saved' }));
         setTimeout(() => {
           setAutoSaveMap((prev) => {
@@ -1090,7 +1216,9 @@ const Admin = ({ isAdmin }) => {
         params: {
           search: quizQuestionsSearch || undefined,
           unused: quizQuestionsUnusedOnly ? true : undefined,
-          difficulty: quizQuestionsDifficulty || undefined
+          difficulty: quizQuestionsDifficulty || undefined,
+          status: quizQuestionsStatus || undefined,
+          tags: quizQuestionsTags || undefined
         }
       });
       downloadCsv('quiz_questions.csv', response.data);
@@ -1108,16 +1236,20 @@ const Admin = ({ isAdmin }) => {
     try {
       const formData = new FormData();
       formData.append('file', quizImportFile);
-      const response = await axios.post(`${API_URL}/api/quiz/questions/import`, formData, {
+      const endpoint = `${API_URL}/api/quiz/questions/import${quizImportReplace ? '?replace=true' : ''}`;
+      const response = await axios.post(endpoint, formData, {
         headers: {
           ...getAuthHeaders(),
           'Content-Type': 'multipart/form-data'
         }
       });
-      pushToast(`Import termine: ${response.data?.inserted || 0} questions.`, 'success');
+      const replacedLabel = quizImportReplace ? ' (remplacement complet)' : '';
+      pushToast(`Import termine: ${response.data?.inserted || 0} questions${replacedLabel}.`, 'success');
       setQuizImportFile(null);
+      setQuizImportReplace(false);
       await loadQuizQuestions(true);
       await loadQuizStats();
+      await loadQuizQuality();
     } catch (error) {
       console.error('Error:', error);
       pushToast('Import CSV echoue.', 'error');
@@ -1491,6 +1623,26 @@ const Admin = ({ isAdmin }) => {
               <option value="medium">Moyen</option>
               <option value="hard">Difficile</option>
             </select>
+            <input
+              type="text"
+              placeholder="Source (ex: Coran 2:255)"
+              value={quizForm.source}
+              onChange={(e) => setQuizForm({ ...quizForm, source: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Tags (ex: aqida, fiqh)"
+              value={quizForm.tags}
+              onChange={(e) => setQuizForm({ ...quizForm, tags: e.target.value })}
+            />
+            <select
+              value={quizForm.status}
+              onChange={(e) => setQuizForm({ ...quizForm, status: e.target.value })}
+            >
+              <option value="draft">Brouillon</option>
+              <option value="review">A relire</option>
+              <option value="validated">Validee</option>
+            </select>
             <button type="submit" className="btn-submit">Ajouter la question</button>
           </form>
 
@@ -1681,6 +1833,23 @@ const Admin = ({ isAdmin }) => {
                   <option value="medium">Moyen</option>
                   <option value="hard">Difficile</option>
                 </select>
+                <select
+                  value={quizQuestionsStatus}
+                  onChange={(e) => setQuizQuestionsStatus(e.target.value)}
+                >
+                  <option value="">Tous statuts</option>
+                  <option value="legacy">Non defini</option>
+                  <option value="draft">Brouillon</option>
+                  <option value="review">A relire</option>
+                  <option value="validated">Validee</option>
+                  <option value="archived">Archivee</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Tags (ex: aqida, fiqh)"
+                  value={quizQuestionsTags}
+                  onChange={(e) => setQuizQuestionsTags(e.target.value)}
+                />
                 <label className="quiz-edit-filter">
                   <input
                     type="checkbox"
@@ -1710,6 +1879,14 @@ const Admin = ({ isAdmin }) => {
                     accept=".csv"
                     onChange={(e) => setQuizImportFile(e.target.files?.[0] || null)}
                   />
+                  <label className="quiz-import-replace">
+                    <input
+                      type="checkbox"
+                      checked={quizImportReplace}
+                      onChange={(e) => setQuizImportReplace(e.target.checked)}
+                    />
+                    Remplacer toutes les questions
+                  </label>
                   <button
                     type="button"
                     className="btn-create-user"
@@ -1719,6 +1896,10 @@ const Admin = ({ isAdmin }) => {
                     {quizImportLoading ? 'Import...' : 'Importer CSV'}
                   </button>
                 </div>
+                <p className="quiz-import-hint">
+                  Colonnes attendues: question, option1, option2, option3, option4,
+                  correct_index, difficulty, source, tags, status.
+                </p>
               </div>
             </div>
             <div className="quiz-stats-section">
@@ -1753,12 +1934,119 @@ const Admin = ({ isAdmin }) => {
                   </div>
                 </div>
               )}
-              {quizStats && quizStats.unused_questions < 200 && (
-                <p className="quiz-low-warning">
-                  Attention: il reste peu de questions non utilisees. Pensez a en ajouter.
-                </p>
-              )}
+            {quizStats && quizStats.unused_questions < 200 && (
+              <p className="quiz-low-warning">
+                Attention: il reste peu de questions non utilisees. Pensez a en ajouter.
+              </p>
+            )}
+          </div>
+          <div className="quiz-quality-section">
+            <div className="section-header">
+              <h3>Qualite et validation</h3>
+              <button
+                type="button"
+                className="btn-create-user"
+                onClick={loadQuizQuality}
+                disabled={quizQualityLoading}
+              >
+                {quizQualityLoading ? 'Chargement...' : 'Rafraichir'}
+              </button>
             </div>
+            {quizQualityError && <p className="quiz-daily-error">{quizQualityError}</p>}
+            {quizQuality?.overview && (
+              <div className="quiz-quality-grid">
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.total}</h3>
+                  <p>Total questions</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.validated}</h3>
+                  <p>Validees</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.draft}</h3>
+                  <p>Brouillons</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.review}</h3>
+                  <p>A relire</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.archived}</h3>
+                  <p>Archivees</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.legacy}</h3>
+                  <p>Sans statut</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.missing_source}</h3>
+                  <p>Sources manquantes</p>
+                </div>
+                <div className="quality-card">
+                  <h3>{quizQuality.overview.missing_tags}</h3>
+                  <p>Tags manquants</p>
+                </div>
+              </div>
+            )}
+            {quizQuality?.duplicates?.length > 0 && (
+              <div className="quiz-quality-list">
+                <h4>Doublons detectes</h4>
+                <div className="quality-items">
+                  {quizQuality.duplicates.map((dup) => (
+                    <div key={dup.normText} className="quality-item">
+                      <p>{dup.question}</p>
+                      <span>{dup.count} occurrences</span>
+                      <span>IDs: {dup.ids.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {quizQuality?.performance && (
+              <div className="quiz-quality-columns">
+                <div className="quiz-quality-list">
+                  <h4>Trop difficiles</h4>
+                  {(quizQuality.performance.tooHard || []).length === 0 && (
+                    <p>Aucun signal critique.</p>
+                  )}
+                  {(quizQuality.performance.tooHard || []).map((item) => (
+                    <div key={item.id} className="quality-item">
+                      <p>{item.question}</p>
+                      <span>{formatAccuracy(item.accuracy)} sur {item.attempts} essais</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="quiz-quality-list">
+                  <h4>Trop faciles</h4>
+                  {(quizQuality.performance.tooEasy || []).length === 0 && (
+                    <p>Aucun signal critique.</p>
+                  )}
+                  {(quizQuality.performance.tooEasy || []).map((item) => (
+                    <div key={item.id} className="quality-item">
+                      <p>{item.question}</p>
+                      <span>{formatAccuracy(item.accuracy)} sur {item.attempts} essais</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {quizQuality?.recentVersions?.length > 0 && (
+              <div className="quiz-quality-list">
+                <h4>Dernieres modifications</h4>
+                <div className="quality-items">
+                  {quizQuality.recentVersions.map((entry) => (
+                    <div key={entry.id} className="quality-item">
+                      <p>{entry.question}</p>
+                      <span>{entry.changeType}</span>
+                      <span>{entry.changedBy || 'systeme'}</span>
+                      <span>{new Date(entry.changedAt).toLocaleString('fr-FR')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
             <div className="quiz-leaderboard-section">
               <div className="section-header">
                 <h3>Top 10 scores (semaine)</h3>
@@ -1817,6 +2105,22 @@ const Admin = ({ isAdmin }) => {
                         onChange={(e) => handleQuizQuestionChange(question.id, 'question', e.target.value)}
                       />
                     </div>
+                    <div className="quiz-edit-row">
+                      <label>Source</label>
+                      <input
+                        type="text"
+                        value={question.source || ''}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'source', e.target.value)}
+                      />
+                    </div>
+                    <div className="quiz-edit-row">
+                      <label>Tags (virgules)</label>
+                      <input
+                        type="text"
+                        value={question.tags || ''}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'tags', e.target.value)}
+                      />
+                    </div>
                     <div className="quiz-edit-options">
                       {question.options.map((option, index) => (
                         <div key={index} className="quiz-edit-row">
@@ -1849,12 +2153,29 @@ const Admin = ({ isAdmin }) => {
                         <option value="medium">Moyen</option>
                         <option value="hard">Difficile</option>
                       </select>
+                      <select
+                        value={question.status || ''}
+                        onChange={(e) => handleQuizQuestionChange(question.id, 'status', e.target.value)}
+                      >
+                        <option value="">Non defini</option>
+                        <option value="draft">Brouillon</option>
+                        <option value="review">A relire</option>
+                        <option value="validated">Validee</option>
+                        <option value="archived">Archivee</option>
+                      </select>
                       <button
                         type="button"
                         className="btn-submit"
                         onClick={() => saveQuizQuestion(question)}
                       >
                         Enregistrer
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-action btn-reset"
+                        onClick={() => toggleQuestionVersions(question.id)}
+                      >
+                        {versionOpenId === question.id ? 'Masquer historique' : 'Voir historique'}
                       </button>
                       {autoSaveMap[question.id] && (
                         <span className="auto-save-status">
@@ -1865,6 +2186,35 @@ const Admin = ({ isAdmin }) => {
                         </span>
                       )}
                     </div>
+                    <div className="quiz-edit-meta">
+                      <span>Statut: {formatStatusLabel(question.status)}</span>
+                      {question.updatedAt && (
+                        <span>
+                          Derniere maj: {new Date(question.updatedAt).toLocaleString('fr-FR')}
+                        </span>
+                      )}
+                    </div>
+                    {versionOpenId === question.id && (
+                      <div className="quiz-version-list">
+                        {versionLoadingId === question.id && (
+                          <p>Chargement de l historique...</p>
+                        )}
+                        {versionLoadingId !== question.id && (questionVersions[question.id] || []).length === 0 && (
+                          <p>Aucune version disponible.</p>
+                        )}
+                        {versionLoadingId !== question.id && (questionVersions[question.id] || []).length > 0 && (
+                          <div className="quiz-version-items">
+                            {(questionVersions[question.id] || []).map((version) => (
+                              <div key={version.id} className="quiz-version-item">
+                                <strong>{version.changeType}</strong>
+                                <span>{new Date(version.changedAt).toLocaleString('fr-FR')}</span>
+                                <span>{version.changedBy || 'systeme'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -41,6 +41,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/users', require('./src/routes/users'));
 app.use('/api/members', require('./src/routes/members'));
+app.use('/api/profile', require('./src/routes/profileExtras'));
 app.use('/api/events', require('./src/routes/events'));
 app.use('/api/delegations', require('./src/routes/delegations'));
 app.use('/api/roles', require('./src/routes/roles'));

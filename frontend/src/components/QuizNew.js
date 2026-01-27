@@ -17,6 +17,7 @@ const Quiz = ({ user }) => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [openWindow, setOpenWindow] = useState({ from: '20:00', until: '23:59' });
+  const [selectedLevel, setSelectedLevel] = useState('random');
   const submittingRef = useRef(false);
   const resolvedUserId = user?.id || fallbackUserIdRef.current;
   const resolvedName = user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Participant';
@@ -26,9 +27,13 @@ const Quiz = ({ user }) => {
     loadDailyQuiz();
   }, []);
 
-  const loadDailyQuiz = async () => {
+  const loadDailyQuiz = async (levelOverride) => {
+    const level = levelOverride || selectedLevel || 'random';
     try {
-      const response = await axios.get(`${API_URL}/api/quiz/daily/quiz`);
+      setStatus('loading');
+      const response = await axios.get(`${API_URL}/api/quiz/daily/quiz`, {
+        params: { level }
+      });
       setQuestions(response.data.questions);
       setStatus('start');
     } catch (error) {
@@ -81,7 +86,8 @@ const Quiz = ({ user }) => {
       await axios.post(`${API_URL}/api/quiz/daily/start`, {
         userId: resolvedUserId,
         email: user?.email,
-        name: resolvedName
+        name: resolvedName,
+        level: selectedLevel
       });
       setStatus('quiz');
       setTimeLeft(10);
@@ -107,7 +113,8 @@ const Quiz = ({ user }) => {
         userId: resolvedUserId,
         questionIndex: currentIndex,
         selectedIndex,
-        timeSpent: 10 - timeLeft
+        timeSpent: 10 - timeLeft,
+        level: selectedLevel
       });
 
       if (response.data.isCorrect) {
@@ -138,7 +145,8 @@ const Quiz = ({ user }) => {
   const completeQuiz = async () => {
     try {
       const response = await axios.post(`${API_URL}/api/quiz/daily/complete`, {
-        userId: resolvedUserId
+        userId: resolvedUserId,
+        level: selectedLevel
       });
 
       setUserResult(response.data);
@@ -168,15 +176,6 @@ const Quiz = ({ user }) => {
     }
   };
 
-  const getDifficultyColor = (difficulty) => {
-    const colors = {
-      easy: '#4CAF50',
-      medium: '#FF9800',
-      hard: '#F44336'
-    };
-    return colors[difficulty] || '#2196F3';
-  };
-
   const getLevelColor = (level) => {
     const colors = {
       beginner: '#4CAF50',
@@ -187,6 +186,32 @@ const Quiz = ({ user }) => {
     return colors[level] || '#666';
   };
 
+  const levelOptions = [
+    {
+      value: 'medium',
+      label: 'Moyen',
+      description: 'Questions solides pour progresser'
+    },
+    {
+      value: 'hard',
+      label: 'Difficile',
+      description: 'Defi exigeant pour experts'
+    },
+    {
+      value: 'random',
+      label: 'Aleatoire',
+      description: 'Melange de niveaux'
+    }
+  ];
+
+  const handleLevelSelect = (level) => {
+    if (level === selectedLevel) {
+      return;
+    }
+    setSelectedLevel(level);
+    loadDailyQuiz(level);
+  };
+
   // Start screen
   if (status === 'start') {
     return (
@@ -194,6 +219,23 @@ const Quiz = ({ user }) => {
         <div className="quiz-header-card">
           <h2>📚 Quiz Islamique Quotidien</h2>
           <p>Commence à 20h00 • 20 questions • 10 secondes par question</p>
+        </div>
+
+        <div className="quiz-level-picker">
+          <h3>Choisissez votre niveau</h3>
+          <div className="quiz-level-grid">
+            {levelOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`quiz-level-card ${selectedLevel === option.value ? 'active' : ''}`}
+                onClick={() => handleLevelSelect(option.value)}
+              >
+                <span className="quiz-level-title">{option.label}</span>
+                <span className="quiz-level-desc">{option.description}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="quiz-info-grid">
@@ -241,12 +283,6 @@ const Quiz = ({ user }) => {
             <div className={`timer ${timeLeft <= 3 ? 'warning' : ''}`}>
               {timeLeft}
             </div>
-            <span 
-              className="difficulty-badge"
-              style={{ backgroundColor: getDifficultyColor(question.difficulty) }}
-            >
-              {question.difficulty}
-            </span>
           </div>
 
           <h3 className="question-text">{question.question}</h3>

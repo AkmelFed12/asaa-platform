@@ -15,6 +15,8 @@ const QUIZ_CLOSE_MINUTE = 59;
 const QUIZ_TIMEZONE = 'Africa/Abidjan';
 const CSV_IMPORT_LIMIT = 500;
 const VALID_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const VALID_STATUSES = new Set(['draft', 'review', 'validated', 'archived']);
+const VALID_DAILY_LEVELS = new Set(['easy', 'medium', 'hard', 'random']);
 const csvUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -64,7 +66,7 @@ const parseCsv = (content) => {
 
   for (let i = 0; i < lines.length; i += 1) {
     const values = parseCsvLine(lines[i]);
-    if (i === 0 && values[0] === 'question') {
+    if (i === 0 && String(values[0] || '').toLowerCase() === 'question') {
       continue;
     }
     rows.push(values);
@@ -76,6 +78,87 @@ const parseCsv = (content) => {
 const normalizeDifficulty = (value) => {
   const lowered = String(value || '').toLowerCase();
   return VALID_DIFFICULTIES.has(lowered) ? lowered : null;
+};
+
+const normalizeDailyLevel = (value) => {
+  const lowered = String(value || '').toLowerCase().trim();
+  if (['moyen', 'medium'].includes(lowered)) return 'medium';
+  if (['difficile', 'hard'].includes(lowered)) return 'hard';
+  if (['aleatoire', 'random'].includes(lowered)) return 'random';
+  if (['facile', 'easy'].includes(lowered)) return 'easy';
+  if (VALID_DAILY_LEVELS.has(lowered)) return lowered;
+  return 'random';
+};
+
+const normalizeStatus = (value) => {
+  const lowered = String(value || '').toLowerCase().trim();
+  if (!lowered) return null;
+  return VALID_STATUSES.has(lowered) ? lowered : null;
+};
+
+const normalizeSource = (value) => {
+  const text = String(value || '').trim();
+  return text.length ? text : null;
+};
+
+const parseTagsInput = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return [];
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return [];
+  }
+  if (text.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (error) {
+      // Fall back to comma split.
+    }
+  }
+  return text.split(',');
+};
+
+const normalizeTags = (value) => {
+  const raw = parseTagsInput(value);
+  const tags = [];
+  const seen = new Set();
+  raw.forEach((item) => {
+    const trimmed = String(item || '').trim().toLowerCase();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    tags.push(trimmed);
+  });
+  return tags.length ? tags : null;
+};
+
+const normalizeQuestionText = (value) => (
+  String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
+);
+
+const parseStatusFilter = (value) => {
+  const result = { statuses: [], includeLegacy: false };
+  if (!value) return result;
+  const parts = String(value)
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+  parts.forEach((part) => {
+    if (['legacy', 'none', 'null'].includes(part)) {
+      result.includeLegacy = true;
+      return;
+    }
+    if (VALID_STATUSES.has(part)) {
+      result.statuses.push(part);
+    }
+  });
+  return result;
 };
 
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -114,36 +197,27 @@ const ensureQuizOpen = (res) => {
   return false;
 };
 
-async function getOrCreateDailyQuiz() {
+async function getOrCreateDailyQuiz(level) {
   const quizDate = getToday();
+  const quizLevel = normalizeDailyLevel(level);
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `DELETE FROM quiz_questions
-       WHERE id IN (
-         SELECT question_id
-         FROM quiz_question_usage
-         WHERE quiz_date < $1
-       )`,
-      [quizDate]
-    );
-
     const insertQuiz = await client.query(
-      `INSERT INTO daily_quizzes (quiz_date)
-       VALUES ($1)
-       ON CONFLICT (quiz_date) DO NOTHING
+      `INSERT INTO daily_quizzes (quiz_date, quiz_level)
+       VALUES ($1, $2)
+       ON CONFLICT (quiz_date, quiz_level) DO NOTHING
        RETURNING id`,
-      [quizDate]
+      [quizDate, quizLevel]
     );
 
     let quizId = insertQuiz.rows[0]?.id;
     if (!quizId) {
       const existing = await client.query(
-        'SELECT id FROM daily_quizzes WHERE quiz_date = $1',
-        [quizDate]
+        'SELECT id FROM daily_quizzes WHERE quiz_date = $1 AND quiz_level = $2',
+        [quizDate, quizLevel]
       );
       quizId = existing.rows[0]?.id;
     }
@@ -154,14 +228,39 @@ async function getOrCreateDailyQuiz() {
     );
 
     if (existingQuestions[0].count === 0) {
+      const params = [];
+      let difficultyFilter = '';
+      if (['easy', 'medium', 'hard'].includes(quizLevel)) {
+        params.push(quizLevel);
+        difficultyFilter = `AND q.difficulty = $${params.length}`;
+      }
+      params.push(DAILY_QUESTION_COUNT);
+      const limitParam = `$${params.length}`;
+
       const { rows: questions } = await client.query(
-        `SELECT id, question_text, options, correct_index, difficulty
-         FROM quiz_questions
-         WHERE is_active = TRUE
-           AND id NOT IN (SELECT question_id FROM quiz_question_usage)
-         ORDER BY RANDOM()
-         LIMIT $1`,
-        [DAILY_QUESTION_COUNT]
+        `WITH used_texts AS (
+           SELECT LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g')) AS norm_text
+           FROM quiz_question_usage u
+           JOIN quiz_questions q ON q.id = u.question_id
+         ),
+         candidate_questions AS (
+           SELECT q.id, q.question_text, q.options, q.correct_index, q.difficulty,
+                  LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g')) AS norm_text
+           FROM quiz_questions q
+           WHERE q.is_active = TRUE
+             AND (q.status IS NULL OR q.status = 'validated')
+             ${difficultyFilter}
+             AND q.id NOT IN (SELECT question_id FROM quiz_question_usage)
+             AND NOT EXISTS (
+               SELECT 1 FROM used_texts ut
+               WHERE ut.norm_text = LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g'))
+             )
+         )
+         SELECT DISTINCT ON (norm_text) id, question_text, options, correct_index, difficulty
+         FROM candidate_questions
+         ORDER BY norm_text, RANDOM()
+         LIMIT ${limitParam}`,
+        params
       );
 
       if (questions.length < DAILY_QUESTION_COUNT) {
@@ -184,7 +283,7 @@ async function getOrCreateDailyQuiz() {
     }
 
     await client.query('COMMIT');
-    return { quizId, quizDate };
+    return { quizId, quizDate, quizLevel };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -268,18 +367,43 @@ async function getWeeklyRank(userId) {
   return rows[0]?.rank || null;
 }
 
+const recordQuestionVersion = async (client, question, changeType, changedBy, note = null) => {
+  if (!question?.id) return;
+  await client.query(
+    `INSERT INTO quiz_question_versions
+     (question_id, question_text, options, correct_index, difficulty, source, tags, status, created_by,
+      change_type, changed_by, note)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [
+      question.id,
+      question.question_text,
+      JSON.stringify(question.options || []),
+      question.correct_index,
+      question.difficulty,
+      question.source || null,
+      question.tags || null,
+      question.status || null,
+      question.created_by || null,
+      changeType,
+      changedBy || null,
+      note
+    ]
+  );
+};
+
 router.get('/daily/quiz', async (req, res, next) => {
   if (!ensureQuizOpen(res)) {
     return;
   }
 
   try {
-    const { quizId, quizDate } = await getOrCreateDailyQuiz();
+    const { quizId, quizDate, quizLevel } = await getOrCreateDailyQuiz(req.query.level);
     const questions = await getDailyQuestions(quizId);
 
     res.json({
       success: true,
       date: quizDate,
+      level: quizLevel,
       totalQuestions: DAILY_QUESTION_COUNT,
       timePerQuestion: TIME_PER_QUESTION,
       questions
@@ -291,7 +415,7 @@ router.get('/daily/quiz', async (req, res, next) => {
 
 router.get('/daily/admin/quiz', requireAdmin, async (req, res, next) => {
   try {
-    const { quizId, quizDate } = await getOrCreateDailyQuiz();
+    const { quizId, quizDate, quizLevel } = await getOrCreateDailyQuiz(req.query.level);
     const { rows } = await pool.query(
       `SELECT dq.position, q.id, q.question_text, q.options, q.difficulty
        FROM daily_quiz_questions dq
@@ -304,6 +428,7 @@ router.get('/daily/admin/quiz', requireAdmin, async (req, res, next) => {
     res.json({
       success: true,
       date: quizDate,
+      level: quizLevel,
       questions: rows.map((row) => ({
         id: row.id,
         position: row.position,
@@ -332,7 +457,7 @@ router.post('/daily/admin/reorder', requireAdmin, async (req, res, next) => {
   try {
     await client.query('BEGIN');
 
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(req.body.level || req.query.level);
     const { rows: attemptRows } = await client.query(
       'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
       [quizId]
@@ -394,13 +519,15 @@ router.post('/daily/admin/reorder', requireAdmin, async (req, res, next) => {
 
 router.get('/daily/admin/history', requireAdmin, async (req, res, next) => {
   const days = Math.min(Number(req.query.days) || 7, 30);
+  const quizLevel = normalizeDailyLevel(req.query.level);
   try {
     const { rows: quizRows } = await pool.query(
-      `SELECT id, quiz_date
+      `SELECT id, quiz_date, quiz_level
        FROM daily_quizzes
+       WHERE quiz_level = $1
        ORDER BY quiz_date DESC
-       LIMIT $1`,
-      [days]
+       LIMIT $2`,
+      [quizLevel, days]
     );
 
     if (quizRows.length === 0) {
@@ -434,6 +561,7 @@ router.get('/daily/admin/history', requireAdmin, async (req, res, next) => {
     const history = quizRows.map((row) => ({
       quizId: row.id,
       date: row.quiz_date,
+      level: row.quiz_level,
       questions: questionMap.get(row.id) || []
     }));
 
@@ -445,14 +573,15 @@ router.get('/daily/admin/history', requireAdmin, async (req, res, next) => {
 
 router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
   const quizDate = getToday();
+  const quizLevel = normalizeDailyLevel(req.body.level || req.query.level);
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
     const { rows: quizRows } = await client.query(
-      'SELECT id FROM daily_quizzes WHERE quiz_date = $1',
-      [quizDate]
+      'SELECT id FROM daily_quizzes WHERE quiz_date = $1 AND quiz_level = $2',
+      [quizDate, quizLevel]
     );
     const quizId = quizRows[0]?.id;
 
@@ -471,17 +600,8 @@ router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
       await client.query('DELETE FROM daily_quizzes WHERE id = $1', [quizId]);
     }
 
-    const { rows: deletedRows } = await client.query(
-      `WITH deleted AS (
-         DELETE FROM quiz_questions
-         WHERE id IN (SELECT question_id FROM quiz_question_usage)
-         RETURNING id
-       )
-       SELECT COUNT(*)::int AS count FROM deleted`
-    );
-
     await client.query('COMMIT');
-    res.json({ success: true, deletedQuestions: deletedRows[0]?.count || 0 });
+    res.json({ success: true, deletedQuestions: 0 });
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -491,15 +611,17 @@ router.post('/daily/admin/cleanup', requireAdmin, async (req, res, next) => {
 });
 
 router.post('/daily/admin/generate', requireAdmin, async (req, res, next) => {
-  const { difficulty, keyword } = req.body;
-  const normalizedDifficulty = typeof difficulty === 'string' ? difficulty.trim() : '';
+  const { difficulty, keyword, level } = req.body;
   const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : '';
+  const quizLevel = normalizeDailyLevel(level);
+  const normalizedDifficulty = normalizeDifficulty(difficulty)
+    || (['easy', 'medium', 'hard'].includes(quizLevel) ? quizLevel : '');
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(quizLevel);
     const { rows: attemptRows } = await client.query(
       'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
       [quizId]
@@ -514,23 +636,41 @@ router.post('/daily/admin/generate', requireAdmin, async (req, res, next) => {
 
     const params = [];
     let filterQuery = `
-      SELECT id, question_text, options, correct_index, difficulty
-      FROM quiz_questions
-      WHERE is_active = TRUE
-        AND id NOT IN (SELECT question_id FROM quiz_question_usage)
+      WITH used_texts AS (
+        SELECT LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g')) AS norm_text
+        FROM quiz_question_usage u
+        JOIN quiz_questions q ON q.id = u.question_id
+      ),
+      candidate_questions AS (
+        SELECT q.id, q.question_text, q.options, q.correct_index, q.difficulty,
+               LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g')) AS norm_text
+        FROM quiz_questions q
+        WHERE q.is_active = TRUE
+          AND (q.status IS NULL OR q.status = 'validated')
+          AND q.id NOT IN (SELECT question_id FROM quiz_question_usage)
+          AND NOT EXISTS (
+            SELECT 1 FROM used_texts ut
+            WHERE ut.norm_text = LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g'))
+          )
     `;
 
     if (normalizedDifficulty) {
       params.push(normalizedDifficulty);
-      filterQuery += ` AND difficulty = $${params.length}`;
+      filterQuery += ` AND q.difficulty = $${params.length}`;
     }
     if (normalizedKeyword) {
       params.push(`%${normalizedKeyword}%`);
-      filterQuery += ` AND question_text ILIKE $${params.length}`;
+      filterQuery += ` AND q.question_text ILIKE $${params.length}`;
     }
 
     params.push(DAILY_QUESTION_COUNT);
-    filterQuery += ` ORDER BY RANDOM() LIMIT $${params.length}`;
+    filterQuery += `
+      )
+      SELECT DISTINCT ON (norm_text) id, question_text, options, correct_index, difficulty
+      FROM candidate_questions
+      ORDER BY norm_text, RANDOM()
+      LIMIT $${params.length}
+    `;
 
     const { rows: questions } = await client.query(filterQuery, params);
     if (questions.length < DAILY_QUESTION_COUNT) {
@@ -576,7 +716,7 @@ router.post('/daily/admin/replace', requireAdmin, async (req, res, next) => {
   try {
     await client.query('BEGIN');
 
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(req.body.level || req.query.level);
     const { rows: attemptRows } = await client.query(
       'SELECT COUNT(*)::int AS count FROM daily_quiz_attempts WHERE quiz_id = $1',
       [quizId]
@@ -602,7 +742,9 @@ router.post('/daily/admin/replace', requireAdmin, async (req, res, next) => {
     const { rows: questionRows } = await client.query(
       `SELECT id, question_text, options, difficulty
        FROM quiz_questions
-       WHERE id = $1 AND is_active = TRUE`,
+       WHERE id = $1
+         AND is_active = TRUE
+         AND (status IS NULL OR status = 'validated')`,
       [numericQuestionId]
     );
     const newQuestion = questionRows[0];
@@ -612,8 +754,13 @@ router.post('/daily/admin/replace', requireAdmin, async (req, res, next) => {
     }
 
     const { rows: usedRows } = await client.query(
-      'SELECT 1 FROM quiz_question_usage WHERE question_id = $1',
-      [numericQuestionId]
+      `SELECT 1
+       FROM quiz_question_usage u
+       JOIN quiz_questions q ON q.id = u.question_id
+       WHERE LOWER(REGEXP_REPLACE(q.question_text, '[[:space:]]+', ' ', 'g')) =
+             LOWER(REGEXP_REPLACE($1, '[[:space:]]+', ' ', 'g'))
+       LIMIT 1`,
+      [newQuestion.question_text]
     );
     if (usedRows[0]) {
       await client.query('ROLLBACK');
@@ -667,13 +814,13 @@ router.post('/daily/start', async (req, res, next) => {
     return;
   }
 
-  const { userId, email, name } = req.body;
+  const { userId, email, name, level } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
   }
 
   try {
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(level);
     const { rows: completedRows } = await pool.query(
       `SELECT id FROM daily_quiz_attempts
        WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NOT NULL
@@ -723,14 +870,14 @@ router.post('/daily/answer', async (req, res, next) => {
     return;
   }
 
-  const { userId, questionIndex, selectedIndex, timeSpent } = req.body;
+  const { userId, questionIndex, selectedIndex, timeSpent, level } = req.body;
 
   if (userId === undefined || questionIndex === undefined) {
     return res.status(400).json({ error: 'User ID and question index required' });
   }
 
   try {
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(level);
     const { rows: attempts } = await pool.query(
       `SELECT id FROM daily_quiz_attempts
        WHERE quiz_id = $1 AND user_id = $2 AND completed_at IS NULL`,
@@ -803,13 +950,13 @@ router.post('/daily/complete', async (req, res, next) => {
     return;
   }
 
-  const { userId } = req.body;
+  const { userId, level } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
   }
 
   try {
-    const { quizId } = await getOrCreateDailyQuiz();
+    const { quizId } = await getOrCreateDailyQuiz(level);
     const { rows: attempts } = await pool.query(
       `SELECT id, started_at, user_name, email
        FROM daily_quiz_attempts
@@ -941,7 +1088,7 @@ router.get('/daily/history/:userId', async (req, res, next) => {
 });
 
 router.post('/questions', requireAdmin, async (req, res, next) => {
-  const { question, options, correctIndex, difficulty } = req.body;
+  const { question, options, correctIndex, difficulty, source, tags, status } = req.body;
   if (!question || !options || correctIndex === undefined || !difficulty) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -950,20 +1097,53 @@ router.post('/questions', requireAdmin, async (req, res, next) => {
     return res.status(400).json({ error: 'Options must be an array' });
   }
 
+  const normalizedSource = normalizeSource(source);
+  const normalizedTags = normalizeTags(tags);
+  const normalizedStatus = normalizeStatus(status) || 'draft';
+  const createdBy = req.user?.email || 'admin';
+
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO quiz_questions (question_text, options, correct_index, difficulty, created_by)
-       VALUES ($1, $2::jsonb, $3, $4, $5)
-       RETURNING id, question_text, options, correct_index, difficulty`,
-      [question, JSON.stringify(options), correctIndex, difficulty, 'admin']
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO quiz_questions
+       (question_text, options, correct_index, difficulty, source, tags, status, created_by)
+       VALUES ($1, $2::jsonb, $3, $4, $5, $6::text[], $7, $8)
+       RETURNING id, question_text, options, correct_index, difficulty, source, tags, status, created_by`,
+      [
+        question,
+        JSON.stringify(options),
+        correctIndex,
+        difficulty,
+        normalizedSource,
+        normalizedTags,
+        normalizedStatus,
+        createdBy
+      ]
     );
+
+    await recordQuestionVersion(client, rows[0], 'create', createdBy);
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
-      question: rows[0]
+      question: {
+        id: rows[0].id,
+        question: rows[0].question_text,
+        options: rows[0].options,
+        correctIndex: rows[0].correct_index,
+        difficulty: rows[0].difficulty,
+        source: rows[0].source,
+        tags: rows[0].tags,
+        status: rows[0].status,
+        createdBy: rows[0].created_by
+      }
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 });
 
@@ -973,23 +1153,48 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const unusedOnly = req.query.unused === 'true';
   const difficulty = typeof req.query.difficulty === 'string' ? req.query.difficulty.trim() : '';
+  const statusFilter = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+  const tagsFilter = typeof req.query.tags === 'string' ? req.query.tags.trim() : '';
 
   try {
     let query = `
-      SELECT id, question_text, options, correct_index, difficulty, created_at, created_by
+      SELECT id, question_text, options, correct_index, difficulty, source, tags, status, created_at, updated_at, created_by
       FROM quiz_questions
     `;
     const params = [];
+    const conditions = [];
     if (unusedOnly) {
-      query += ` WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)`;
+      conditions.push('id NOT IN (SELECT question_id FROM quiz_question_usage)');
     }
     if (difficulty) {
       params.push(difficulty);
-      query += `${unusedOnly ? ' AND' : ' WHERE'} difficulty = $${params.length}`;
+      conditions.push(`difficulty = $${params.length}`);
     }
     if (search) {
       params.push(`%${search}%`);
-      query += `${unusedOnly || difficulty ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
+      conditions.push(`question_text ILIKE $${params.length}`);
+    }
+    if (statusFilter) {
+      const { statuses, includeLegacy } = parseStatusFilter(statusFilter);
+      if (includeLegacy && statuses.length > 0) {
+        params.push(statuses);
+        conditions.push(`(status = ANY($${params.length}::text[]) OR status IS NULL)`);
+      } else if (includeLegacy) {
+        conditions.push('status IS NULL');
+      } else if (statuses.length > 0) {
+        params.push(statuses);
+        conditions.push(`status = ANY($${params.length}::text[])`);
+      }
+    }
+    if (tagsFilter) {
+      const tags = normalizeTags(tagsFilter);
+      if (tags?.length) {
+        params.push(tags);
+        conditions.push(`tags && $${params.length}::text[]`);
+      }
+    }
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
     }
     params.push(limit, offset);
     query += `
@@ -1007,7 +1212,11 @@ router.get('/questions', requireAdmin, async (req, res, next) => {
         options: row.options,
         correctIndex: row.correct_index,
         difficulty: row.difficulty,
+        source: row.source,
+        tags: row.tags,
+        status: row.status,
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
         createdBy: row.created_by
       })),
       limit,
@@ -1039,6 +1248,127 @@ router.get('/admin/stats', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.get('/admin/quality', requireAdmin, async (req, res, next) => {
+  const minAttempts = Math.max(Number(req.query.minAttempts) || 20, 5);
+  try {
+    const { rows: overviewRows } = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE status = 'validated')::int AS validated,
+         COUNT(*) FILTER (WHERE status = 'draft')::int AS draft,
+         COUNT(*) FILTER (WHERE status = 'review')::int AS review,
+         COUNT(*) FILTER (WHERE status = 'archived')::int AS archived,
+         COUNT(*) FILTER (WHERE status IS NULL)::int AS legacy,
+         COUNT(*) FILTER (WHERE source IS NULL OR source = '')::int AS missing_source,
+         COUNT(*) FILTER (WHERE tags IS NULL OR array_length(tags, 1) = 0)::int AS missing_tags
+       FROM quiz_questions`
+    );
+
+    const { rows: duplicateRows } = await pool.query(
+      `WITH normalized AS (
+         SELECT id,
+                question_text,
+                LOWER(REGEXP_REPLACE(question_text, '[[:space:]]+', ' ', 'g')) AS norm_text
+         FROM quiz_questions
+       )
+       SELECT
+         norm_text,
+         MIN(question_text) AS question_text,
+         ARRAY_AGG(id ORDER BY id) AS ids,
+         COUNT(*)::int AS count
+       FROM normalized
+       GROUP BY norm_text
+       HAVING COUNT(*) > 1
+       ORDER BY count DESC, MIN(id)
+       LIMIT 50`
+    );
+
+    const { rows: tooHard } = await pool.query(
+      `WITH performance AS (
+         SELECT
+           q.id,
+           q.question_text,
+           COUNT(a.id)::int AS attempts,
+           SUM(CASE WHEN a.is_correct THEN 1 ELSE 0 END)::int AS correct,
+           (SUM(CASE WHEN a.is_correct THEN 1 ELSE 0 END)::float / COUNT(a.id)) AS accuracy
+         FROM quiz_questions q
+         JOIN daily_quiz_answers a ON a.question_id = q.id
+         GROUP BY q.id, q.question_text
+         HAVING COUNT(a.id) >= $1
+       )
+       SELECT id, question_text, attempts, accuracy
+       FROM performance
+       WHERE accuracy <= 0.3
+       ORDER BY accuracy ASC, attempts DESC
+       LIMIT 20`,
+      [minAttempts]
+    );
+
+    const { rows: tooEasy } = await pool.query(
+      `WITH performance AS (
+         SELECT
+           q.id,
+           q.question_text,
+           COUNT(a.id)::int AS attempts,
+           SUM(CASE WHEN a.is_correct THEN 1 ELSE 0 END)::int AS correct,
+           (SUM(CASE WHEN a.is_correct THEN 1 ELSE 0 END)::float / COUNT(a.id)) AS accuracy
+         FROM quiz_questions q
+         JOIN daily_quiz_answers a ON a.question_id = q.id
+         GROUP BY q.id, q.question_text
+         HAVING COUNT(a.id) >= $1
+       )
+       SELECT id, question_text, attempts, accuracy
+       FROM performance
+       WHERE accuracy >= 0.9
+       ORDER BY accuracy DESC, attempts DESC
+       LIMIT 20`,
+      [minAttempts]
+    );
+
+    const { rows: recentVersions } = await pool.query(
+      `SELECT id, question_id, question_text, change_type, changed_by, changed_at
+       FROM quiz_question_versions
+       ORDER BY changed_at DESC
+       LIMIT 15`
+    );
+
+    res.json({
+      success: true,
+      overview: overviewRows[0],
+      duplicates: duplicateRows.map((row) => ({
+        normText: row.norm_text,
+        question: row.question_text,
+        ids: row.ids,
+        count: row.count
+      })),
+      performance: {
+        tooHard: tooHard.map((row) => ({
+          id: row.id,
+          question: row.question_text,
+          attempts: row.attempts,
+          accuracy: Number(row.accuracy)
+        })),
+        tooEasy: tooEasy.map((row) => ({
+          id: row.id,
+          question: row.question_text,
+          attempts: row.attempts,
+          accuracy: Number(row.accuracy)
+        }))
+      },
+      recentVersions: recentVersions.map((row) => ({
+        id: row.id,
+        questionId: row.question_id,
+        question: row.question_text,
+        changeType: row.change_type,
+        changedBy: row.changed_by,
+        changedAt: row.changed_at
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/questions/import', requireAdmin, csvUpload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
@@ -1049,24 +1379,53 @@ router.post('/questions/import', requireAdmin, csvUpload.single('file'), async (
     const rows = parseCsv(content);
     const prepared = [];
     let skipped = 0;
+    const seen = new Set();
+    const replaceAll = req.query.replace === 'true';
 
     for (const row of rows) {
-      if (row.length < 7) {
+      if (row.length < 6) {
         skipped += 1;
         continue;
       }
-      const [question, option1, option2, option3, option4, correctIndexRaw, difficultyRaw] = row;
+      const [
+        question,
+        option1,
+        option2,
+        option3,
+        option4,
+        correctIndexRaw,
+        difficultyRaw,
+        sourceRaw,
+        tagsRaw,
+        statusRaw
+      ] = row;
       const correctIndex = Number(correctIndexRaw);
-      const difficulty = normalizeDifficulty(difficultyRaw);
-      if (!question || Number.isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3 || !difficulty) {
+      const normalizedQuestion = normalizeQuestionText(question);
+      const difficulty = normalizeDifficulty(difficultyRaw) || 'hard';
+      const source = normalizeSource(sourceRaw);
+      const tags = normalizeTags(tagsRaw);
+      const status = normalizeStatus(statusRaw) || 'validated';
+      if (!normalizedQuestion || seen.has(normalizedQuestion)) {
         skipped += 1;
         continue;
       }
+      if (!option1 || !option2 || !option3 || !option4) {
+        skipped += 1;
+        continue;
+      }
+      if (Number.isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+        skipped += 1;
+        continue;
+      }
+      seen.add(normalizedQuestion);
       prepared.push({
         question,
         options: [option1, option2, option3, option4],
         correctIndex,
         difficulty,
+        source,
+        tags,
+        status,
         createdBy: 'csv-import'
       });
     }
@@ -1078,25 +1437,63 @@ router.post('/questions/import', requireAdmin, csvUpload.single('file'), async (
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      if (replaceAll) {
+        await client.query('TRUNCATE quiz_questions RESTART IDENTITY CASCADE');
+      }
       for (let i = 0; i < prepared.length; i += CSV_IMPORT_LIMIT) {
         const chunk = prepared.slice(i, i + CSV_IMPORT_LIMIT);
         const values = [];
         const placeholders = chunk.map((row, index) => {
-          const offset = index * 5;
+          const offset = index * 8;
           values.push(
             row.question,
             JSON.stringify(row.options),
             row.correctIndex,
             row.difficulty,
+            row.source,
+            row.tags,
+            row.status,
             row.createdBy
           );
-          return `($${offset + 1}, $${offset + 2}::jsonb, $${offset + 3}, $${offset + 4}, $${offset + 5})`;
+          return `($${offset + 1}, $${offset + 2}::jsonb, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}::text[], $${offset + 7}, $${offset + 8})`;
         });
-        await client.query(
-          `INSERT INTO quiz_questions (question_text, options, correct_index, difficulty, created_by)
-           VALUES ${placeholders.join(', ')}`,
+        const insertResult = await client.query(
+          `INSERT INTO quiz_questions
+           (question_text, options, correct_index, difficulty, source, tags, status, created_by)
+           VALUES ${placeholders.join(', ')}
+           RETURNING id, question_text, options, correct_index, difficulty, source, tags, status, created_by`,
           values
         );
+
+        const versionValues = [];
+        const versionPlaceholders = insertResult.rows.map((row, index) => {
+          const offset = index * 12;
+          versionValues.push(
+            row.id,
+            row.question_text,
+            JSON.stringify(row.options || []),
+            row.correct_index,
+            row.difficulty,
+            row.source,
+            row.tags,
+            row.status,
+            row.created_by,
+            'import',
+            req.user?.email || 'csv-import',
+            replaceAll ? 'replace-all' : null
+          );
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}::jsonb, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12})`;
+        });
+
+        if (versionPlaceholders.length > 0) {
+          await client.query(
+            `INSERT INTO quiz_question_versions
+             (question_id, question_text, options, correct_index, difficulty, source, tags, status, created_by,
+              change_type, changed_by, note)
+             VALUES ${versionPlaceholders.join(', ')}`,
+            versionValues
+          );
+        }
       }
       await client.query('COMMIT');
     } catch (error) {
@@ -1116,28 +1513,53 @@ router.get('/questions/export/csv', requireAdmin, async (req, res, next) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const unusedOnly = req.query.unused === 'true';
   const difficulty = typeof req.query.difficulty === 'string' ? req.query.difficulty.trim() : '';
+  const statusFilter = typeof req.query.status === 'string' ? req.query.status.trim() : '';
+  const tagsFilter = typeof req.query.tags === 'string' ? req.query.tags.trim() : '';
 
   try {
     let query = `
-      SELECT id, question_text, options, correct_index, difficulty, created_at, created_by
+      SELECT id, question_text, options, correct_index, difficulty, source, tags, status, created_at, updated_at, created_by
       FROM quiz_questions
     `;
     const params = [];
+    const conditions = [];
     if (unusedOnly) {
-      query += ` WHERE id NOT IN (SELECT question_id FROM quiz_question_usage)`;
+      conditions.push('id NOT IN (SELECT question_id FROM quiz_question_usage)');
     }
     if (difficulty) {
       params.push(difficulty);
-      query += `${unusedOnly ? ' AND' : ' WHERE'} difficulty = $${params.length}`;
+      conditions.push(`difficulty = $${params.length}`);
     }
     if (search) {
       params.push(`%${search}%`);
-      query += `${unusedOnly || difficulty ? ' AND' : ' WHERE'} question_text ILIKE $${params.length}`;
+      conditions.push(`question_text ILIKE $${params.length}`);
+    }
+    if (statusFilter) {
+      const { statuses, includeLegacy } = parseStatusFilter(statusFilter);
+      if (includeLegacy && statuses.length > 0) {
+        params.push(statuses);
+        conditions.push(`(status = ANY($${params.length}::text[]) OR status IS NULL)`);
+      } else if (includeLegacy) {
+        conditions.push('status IS NULL');
+      } else if (statuses.length > 0) {
+        params.push(statuses);
+        conditions.push(`status = ANY($${params.length}::text[])`);
+      }
+    }
+    if (tagsFilter) {
+      const tags = normalizeTags(tagsFilter);
+      if (tags?.length) {
+        params.push(tags);
+        conditions.push(`tags && $${params.length}::text[]`);
+      }
+    }
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
     }
     query += ' ORDER BY created_at DESC';
 
     const { rows } = await pool.query(query, params);
-    const header = 'id,question,options,correct_index,difficulty,created_at,created_by\n';
+    const header = 'id,question,options,correct_index,difficulty,source,tags,status,created_at,updated_at,created_by\n';
     const escapeCsv = (value) => {
       const text = String(value ?? '');
       if (text.includes(',') || text.includes('"') || text.includes('\n')) {
@@ -1151,7 +1573,11 @@ router.get('/questions/export/csv', requireAdmin, async (req, res, next) => {
       escapeCsv(JSON.stringify(row.options)),
       row.correct_index,
       row.difficulty,
+      escapeCsv(row.source || ''),
+      escapeCsv((row.tags || []).join(',')),
+      row.status || '',
       row.created_at.toISOString(),
+      row.updated_at ? row.updated_at.toISOString() : '',
       row.created_by
     ].join(',')));
 
@@ -1162,9 +1588,49 @@ router.get('/questions/export/csv', requireAdmin, async (req, res, next) => {
   }
 });
 
+router.get('/questions/:id/versions', requireAdmin, async (req, res, next) => {
+  const questionId = Number(req.params.id);
+  if (!questionId || Number.isNaN(questionId)) {
+    return res.status(400).json({ error: 'Invalid question id' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, question_id, question_text, options, correct_index, difficulty,
+              source, tags, status, change_type, changed_by, note, changed_at
+       FROM quiz_question_versions
+       WHERE question_id = $1
+       ORDER BY changed_at DESC
+       LIMIT 50`,
+      [questionId]
+    );
+
+    res.json({
+      success: true,
+      versions: rows.map((row) => ({
+        id: row.id,
+        questionId: row.question_id,
+        question: row.question_text,
+        options: row.options,
+        correctIndex: row.correct_index,
+        difficulty: row.difficulty,
+        source: row.source,
+        tags: row.tags,
+        status: row.status,
+        changeType: row.change_type,
+        changedBy: row.changed_by,
+        note: row.note,
+        changedAt: row.changed_at
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.put('/questions/:id', requireAdmin, async (req, res, next) => {
   const questionId = Number(req.params.id);
-  const { question, options, correctIndex, difficulty } = req.body;
+  const { question, options, correctIndex, difficulty, source, tags, status } = req.body;
 
   if (!questionId || Number.isNaN(questionId)) {
     return res.status(400).json({ error: 'Invalid question id' });
@@ -1179,21 +1645,52 @@ router.put('/questions/:id', requireAdmin, async (req, res, next) => {
     return res.status(400).json({ error: 'Invalid difficulty' });
   }
 
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
+    await client.query('BEGIN');
+    const { rows: existingRows } = await client.query(
+      `SELECT id, question_text, options, correct_index, difficulty, source, tags, status, created_by
+       FROM quiz_questions
+       WHERE id = $1`,
+      [questionId]
+    );
+
+    if (!existingRows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    const existing = existingRows[0];
+    const normalizedSource = source === undefined ? existing.source : normalizeSource(source);
+    const normalizedTags = tags === undefined ? existing.tags : normalizeTags(tags);
+    const normalizedStatus = status === undefined ? existing.status : normalizeStatus(status);
+
+    const { rows } = await client.query(
       `UPDATE quiz_questions
        SET question_text = $1,
            options = $2::jsonb,
            correct_index = $3,
-           difficulty = $4
-       WHERE id = $5
-       RETURNING id, question_text, options, correct_index, difficulty`,
-      [question, JSON.stringify(options), Number(correctIndex), difficulty, questionId]
+           difficulty = $4,
+           source = $5,
+           tags = $6::text[],
+           status = $7,
+           updated_at = NOW()
+       WHERE id = $8
+       RETURNING id, question_text, options, correct_index, difficulty, source, tags, status, updated_at`,
+      [
+        question,
+        JSON.stringify(options),
+        Number(correctIndex),
+        difficulty,
+        normalizedSource,
+        normalizedTags,
+        normalizedStatus,
+        questionId
+      ]
     );
 
-    if (!rows[0]) {
-      return res.status(404).json({ error: 'Question not found' });
-    }
+    await recordQuestionVersion(client, existing, 'update', req.user?.email || null);
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -1202,11 +1699,18 @@ router.put('/questions/:id', requireAdmin, async (req, res, next) => {
         question: rows[0].question_text,
         options: rows[0].options,
         correctIndex: rows[0].correct_index,
-        difficulty: rows[0].difficulty
+        difficulty: rows[0].difficulty,
+        source: rows[0].source,
+        tags: rows[0].tags,
+        status: rows[0].status,
+        updatedAt: rows[0].updated_at
       }
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 });
 
