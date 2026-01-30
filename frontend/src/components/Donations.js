@@ -12,6 +12,13 @@ const purposeOptions = [
   { value: 'Jeunesse', label: 'Jeunesse' }
 ];
 
+const manualContacts = [
+  { label: 'Contact dons', number: '0574724233', whatsapp: '2250574724233' },
+  { label: 'Contact dons', number: '0705583082', whatsapp: '2250705583082' },
+  { label: 'Contact dons', number: '0779382233', whatsapp: '2250779382233' },
+  { label: 'Contact dons', number: '0151495971', whatsapp: '2250151495971' }
+];
+
 const DONATION_TOKEN_KEY = 'donation_token';
 
 const cleanupCallbackParams = () => {
@@ -228,6 +235,35 @@ function Donations({ user }) {
             <strong>Chaque contribution compte.</strong>
             <span>Merci pour votre soutien constant.</span>
           </div>
+        </div>
+
+        <div className="donation-card donation-manual">
+          <h3>Don manuel</h3>
+          <p>
+            Si le paiement en ligne est bloque (KYC), vous pouvez faire un don par Mobile Money
+            ou virement bancaire. Contactez-nous pour recevoir le numero ou le RIB.
+          </p>
+          <div className="manual-list">
+            {manualContacts.map((contact) => (
+              <div key={contact.number} className="manual-item">
+                <div>
+                  <div className="manual-label">{contact.label}</div>
+                  <span className="manual-number">{contact.number}</span>
+                </div>
+                <a
+                  className="manual-link"
+                  href={`https://wa.me/${contact.whatsapp}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  WhatsApp
+                </a>
+              </div>
+            ))}
+          </div>
+          <p className="manual-note">
+            Apres le transfert, envoyez la preuve de paiement avec votre nom et le motif.
+          </p>
         </div>
 
         <form className="donation-card donation-form" onSubmit={handleSubmit}>

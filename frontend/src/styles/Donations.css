@@ -98,6 +98,57 @@
   font-size: 0.9rem;
 }
 
+.donation-manual p {
+  color: #4a4a4a;
+}
+
+.manual-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+.manual-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #edf2ed;
+  background: #f8faf8;
+}
+
+.manual-label {
+  font-size: 0.85rem;
+  color: #6b6b6b;
+}
+
+.manual-number {
+  font-weight: 700;
+  color: #1d5c2a;
+}
+
+.manual-link {
+  text-decoration: none;
+  background: #e8f5f1;
+  color: #1d5c2a;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.manual-link:hover {
+  background: #dff1ea;
+}
+
+.manual-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b6b6b;
+}
+
 .donation-form .form-group {
   margin-bottom: 16px;
 }
