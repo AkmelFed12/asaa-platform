@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 require('dotenv').config();
 const { initializeSchema } = require('./src/utils/db');
+const { startQuizJobScheduler } = require('./src/utils/quizScheduler');
 
 const app = express();
 
@@ -50,6 +51,8 @@ app.use('/api/quiz', require('./src/routes/quiz'));
 app.use('/api/photos', require('./src/routes/photos'));
 app.use('/api/news', require('./src/routes/news'));
 app.use('/api/stats', require('./src/routes/stats'));
+app.use('/api/audit', require('./src/routes/audit'));
+app.use('/api/donations', require('./src/routes/donations'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -72,6 +75,8 @@ server.listen(PORT, () => {
   console.log(`📸 Photo uploads: enabled`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+startQuizJobScheduler();
 
 initializeSchema().catch((error) => {
   console.error('Database initialization error:', error.message);

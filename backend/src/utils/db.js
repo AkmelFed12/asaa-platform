@@ -84,6 +84,45 @@ async function initializeSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS quiz_question_notes (
+        id BIGSERIAL PRIMARY KEY,
+        question_id BIGINT NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+        note TEXT NOT NULL,
+        note_type TEXT NOT NULL DEFAULT 'note',
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_question_notes_question_id_idx
+        ON quiz_question_notes (question_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_question_notes_created_at_idx
+        ON quiz_question_notes (created_at)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS quiz_question_reports (
+        id BIGSERIAL PRIMARY KEY,
+        question_id BIGINT NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+        user_id BIGINT,
+        reason TEXT NOT NULL,
+        note TEXT,
+        quiz_date DATE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_question_reports_question_id_idx
+        ON quiz_question_reports (question_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS quiz_question_reports_created_at_idx
+        ON quiz_question_reports (created_at)
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS quiz_question_usage (
         question_id BIGINT PRIMARY KEY REFERENCES quiz_questions(id) ON DELETE CASCADE,
         quiz_date DATE NOT NULL
@@ -175,6 +214,24 @@ async function initializeSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS system_jobs (
+        id BIGSERIAL PRIMARY KEY,
+        job_name TEXT NOT NULL,
+        job_date DATE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'running',
+        details JSONB,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        finished_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (job_name, job_date)
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS system_jobs_status_idx
+        ON system_jobs (status)
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS member_photos (
         id BIGSERIAL PRIMARY KEY,
         member_id TEXT NOT NULL,
@@ -257,12 +314,21 @@ async function initializeSchema() {
         date_of_birth DATE,
         city TEXT,
         phone TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await client.query(`
       ALTER TABLE members
       ADD COLUMN IF NOT EXISTS phone TEXT
+    `);
+    await client.query(`
+      ALTER TABLE members
+      ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS members_status_idx
+        ON members (status)
     `);
 
     await client.query(`
@@ -332,6 +398,27 @@ async function initializeSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id BIGSERIAL PRIMARY KEY,
+        actor_id BIGINT,
+        actor_email TEXT,
+        action TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT,
+        meta JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS audit_logs_entity_idx
+        ON audit_logs (entity_type, entity_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS audit_logs_actor_idx
+        ON audit_logs (actor_id)
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id BIGSERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -380,6 +467,47 @@ async function initializeSchema() {
         is_published BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS donations (
+        id BIGSERIAL PRIMARY KEY,
+        tx_ref TEXT NOT NULL UNIQUE,
+        amount NUMERIC(12, 2) NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'XOF',
+        donor_name TEXT,
+        donor_email TEXT,
+        donor_phone TEXT,
+        donor_message TEXT,
+        purpose TEXT,
+        status TEXT NOT NULL DEFAULT 'initialized',
+        provider TEXT NOT NULL DEFAULT 'paydunya',
+        provider_reference TEXT,
+        payment_method TEXT,
+        verified_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      ALTER TABLE donations
+      ADD COLUMN IF NOT EXISTS provider TEXT
+    `);
+    await client.query(`
+      ALTER TABLE donations
+      ADD COLUMN IF NOT EXISTS provider_reference TEXT
+    `);
+    await client.query(`
+      ALTER TABLE donations
+      ALTER COLUMN provider SET DEFAULT 'paydunya'
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS donations_status_idx
+        ON donations (status)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS donations_created_at_idx
+        ON donations (created_at)
     `);
 
     const { rows: countRows } = await client.query(

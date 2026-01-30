@@ -73,4 +73,9 @@ export const quizService = {
   getHistory: (userId) => apiClient.get(`/api/quiz/history/${userId}`),
 };
 
+export const donationService = {
+  initialize: (data) => apiClient.post('/api/donations/initialize', data),
+  verify: (params) => apiClient.get('/api/donations/verify', { params }),
+};
+
 export default apiClient;

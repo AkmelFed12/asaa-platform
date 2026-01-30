@@ -1,0 +1,188 @@
+.donations-container {
+  display: grid;
+  gap: 24px;
+}
+
+.donation-hero {
+  background: linear-gradient(135deg, #f0f9f6 0%, #e8f5f1 100%);
+  padding: 32px 26px;
+  border-radius: 12px;
+  border-left: 5px solid #1d5c2a;
+  text-align: left;
+}
+
+.donation-hero h2 {
+  margin: 0 0 12px 0;
+  color: #1d5c2a;
+}
+
+.donation-hero p {
+  margin: 0 0 8px 0;
+  color: #4a4a4a;
+}
+
+.donation-subtle {
+  font-size: 0.9rem;
+  color: #6b6b6b;
+}
+
+.donation-status {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.donation-status.info {
+  background: #eef7ff;
+  color: #1d4ed8;
+  border-left: 4px solid #3b82f6;
+}
+
+.donation-status.success {
+  background: #e8f5f1;
+  color: #1d5c2a;
+  border-left: 4px solid #1d5c2a;
+}
+
+.donation-status.error {
+  background: #fff1f1;
+  color: #c0392b;
+  border-left: 4px solid #e74c3c;
+}
+
+.donation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.donation-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.donation-card h3 {
+  color: #1d5c2a;
+  margin-top: 0;
+}
+
+.donation-card ul {
+  padding-left: 18px;
+  margin: 12px 0 0;
+  color: #4a4a4a;
+}
+
+.donation-card li {
+  margin-bottom: 6px;
+}
+
+.donation-highlight {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8faf8;
+  border: 1px solid #edf2ed;
+  display: grid;
+  gap: 4px;
+}
+
+.donation-highlight strong {
+  color: #1d5c2a;
+}
+
+.donation-highlight span {
+  color: #6b6b6b;
+  font-size: 0.9rem;
+}
+
+.donation-form .form-group {
+  margin-bottom: 16px;
+}
+
+.donation-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+  font-weight: 600;
+}
+
+.donation-form input,
+.donation-form select,
+.donation-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dfe6df;
+  font-size: 0.95rem;
+}
+
+.donation-form textarea {
+  resize: vertical;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.amount-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.amount-btn {
+  background: #f8faf8;
+  border: 1px solid #dfe6df;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #1d5c2a;
+  transition: all 0.2s ease;
+}
+
+.amount-btn.active,
+.amount-btn:hover:not(:disabled) {
+  background: #1d5c2a;
+  color: #fff;
+  border-color: #1d5c2a;
+}
+
+.amount-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.donation-submit {
+  width: 100%;
+  background: linear-gradient(135deg, #1d5c2a 0%, #2d7a3a 100%);
+  border: none;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.donation-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.donation-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .donation-hero,
+  .donation-card {
+    padding: 20px;
+  }
+}

@@ -1,8 +1,36 @@
 import React from 'react';
 import '../styles/Footer.css';
 
-const Footer = ({ onNavigate }) => {
+const Footer = ({ onNavigate, mode = 'member' }) => {
   const currentYear = new Date().getFullYear();
+  const quickLinks = mode === 'public'
+    ? [
+        { label: 'Accueil', page: 'home' },
+        { label: 'Quiz', page: 'quiz' },
+        { label: 'Gouvernance', page: 'governance' },
+        { label: 'Dons', page: 'donations' }
+      ]
+    : [
+        { label: 'Accueil', page: 'home' },
+        { label: 'Quiz', page: 'quiz' },
+        { label: 'Événements', page: 'events' },
+        { label: 'Actualités', page: 'news' },
+        { label: 'Gouvernance', page: 'governance' },
+        { label: 'Dons', page: 'donations' }
+      ];
+
+  const aboutLinks = mode === 'public'
+    ? [
+        { label: 'À propos de nous', page: 'about' }
+      ]
+    : [
+        { label: 'À propos de nous', page: 'about' },
+        { label: 'Nos activites', page: 'activities' },
+        { label: 'Contact', page: 'contact' },
+        { label: 'Politique de confidentialité', page: 'privacy' },
+        { label: 'Conditions d\'utilisation', page: 'terms' },
+        { label: 'FAQ', page: 'faq' }
+      ];
 
   return (
     <footer className="app-footer">
@@ -15,67 +43,26 @@ const Footer = ({ onNavigate }) => {
         <div className="footer-section">
           <h4>Accès rapide</h4>
           <ul>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('home')}>
-                Accueil
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('quiz')}>
-                Quiz
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('events')}>
-                Événements
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('news')}>
-                Actualités
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('governance')}>
-                Gouvernance
-              </button>
-            </li>
+            {quickLinks.map((link) => (
+              <li key={link.page}>
+                <button type="button" className="footer-link" onClick={() => onNavigate?.(link.page)}>
+                  {link.label}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
 
         <div className="footer-section">
           <h4>À propos</h4>
           <ul>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('about')}>
-                À propos de nous
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('activities')}>
-                Nos activites
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('contact')}>
-                Contact
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('privacy')}>
-                Politique de confidentialité
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('terms')}>
-                Conditions d'utilisation
-              </button>
-            </li>
-            <li>
-              <button type="button" className="footer-link" onClick={() => onNavigate?.('faq')}>
-                FAQ
-              </button>
-            </li>
+            {aboutLinks.map((link) => (
+              <li key={link.page}>
+                <button type="button" className="footer-link" onClick={() => onNavigate?.(link.page)}>
+                  {link.label}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
 

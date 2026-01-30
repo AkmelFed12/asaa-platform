@@ -57,6 +57,21 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+.login-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid white;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.login-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .App-nav {
   background: #f5f5f5;
   padding: 15px 20px;
@@ -137,6 +152,14 @@
 
 .home-hero {
   text-align: center;
+}
+
+.public-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .home-grid {

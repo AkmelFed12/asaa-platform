@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { authService } from '../services/api';
 import '../styles/Auth.css';
 
-function Auth({ onLogin }) {
+function Auth({ onLogin, onGuestAccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -58,6 +58,11 @@ function Auth({ onLogin }) {
             {loading ? 'Chargement...' : 'Se connecter'}
           </button>
         </form>
+        {onGuestAccess && (
+          <button type="button" className="toggle-btn" onClick={onGuestAccess}>
+            Acces invite
+          </button>
+        )}
       </div>
     </div>
   );

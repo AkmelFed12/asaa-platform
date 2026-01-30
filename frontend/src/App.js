@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import Auth from './components/Auth';
+import PublicAccess from './components/PublicAccess';
 import Governance from './components/Governance';
 import MemberProfile from './components/MemberProfile';
-import Quiz from './components/Quiz';
 import QuizNew from './components/QuizNew';
 import Events from './components/Events';
 import Admin from './components/Admin';
 import Footer from './components/Footer';
+import Donations from './components/Donations';
+import AboutSection from './components/AboutSection';
 
 function App() {
   const [user, setUser] = useState(null);
   const [currentPage, setCurrentPage] = useState('home');
   const [newsItems, setNewsItems] = useState([]);
+  const [authView, setAuthView] = useState('public');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -35,6 +38,7 @@ function App() {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     setCurrentPage('home');
+    setAuthView('public');
   };
 
   const handleNavigate = (page, anchorId) => {
@@ -72,9 +76,27 @@ function App() {
     loadNews();
   }, []);
 
-  // Show authentication page if not logged in
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    if (
+      params.get('tx_ref')
+      || params.get('transaction_id')
+      || params.get('status')
+      || params.get('donation')
+      || params.get('token')
+      || params.get('invoice_token')
+      || params.get('paydunya_token')
+    ) {
+      setCurrentPage('donations');
+    }
+  }, [user]);
+
   if (!user) {
-    return <Auth onLogin={handleLogin} />;
+    if (authView === 'login') {
+      return <Auth onLogin={handleLogin} onGuestAccess={() => setAuthView('public')} />;
+    }
+    return <PublicAccess onLoginClick={() => setAuthView('login')} />;
   }
 
   return (
@@ -122,12 +144,18 @@ function App() {
           Gouvernance
         </button>
         <button
+          className={`nav-btn ${currentPage === 'donations' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('donations')}
+        >
+          🤲 Dons
+        </button>
+        <button
           className={`nav-btn ${currentPage === 'profile' ? 'active' : ''}`}
           onClick={() => setCurrentPage('profile')}
         >
           👤 Profil
         </button>
-        {user.role === 'admin' && (
+        {(user.role === 'admin' || user.role === 'quiz_moderator') && (
           <button 
             className={`nav-btn admin-btn ${currentPage === 'admin' ? 'active' : ''}`}
             onClick={() => setCurrentPage('admin')}
@@ -164,33 +192,19 @@ function App() {
                   Voir la gouvernance
                 </button>
               </div>
+              <div className="home-card">
+                <h3>🤲 Dons</h3>
+                <p>Soutenez les actions sociales, educatives et spirituelles.</p>
+                <button type="button" className="home-action-btn" onClick={() => setCurrentPage('donations')}>
+                  Faire un don
+                </button>
+              </div>
             </section>
           </>
         )}
 
         {currentPage === 'about' && (
-          <section className="status-section">
-            <h2>ASAA - Association des Serviteurs d'Allah Azawajal</h2>
-            <p><strong>Valeurs fondamentales :</strong> Respect, Tolerance, Pardon.</p>
-            <p>
-              L'ASAA est une organisation religieuse, sociale et educative. Elle renforce la foi, la fraternite et la
-              solidarite au sein de la communaute, en promouvant un Islam authentique, responsable et apaise.
-            </p>
-            <p>
-              Notre approche place l'etre humain au coeur de l'action : apprendre, servir et grandir ensemble, avec
-              bienveillance et exigence.
-            </p>
-            <h3>Notre mission</h3>
-            <ul>
-              <li>Consolider la cohesion fraternelle entre les membres</li>
-              <li>Encourager l'apprentissage et la transmission des enseignements islamiques</li>
-              <li>Accompagner la jeunesse dans l'education morale et spirituelle</li>
-              <li>Agir pour le bien-etre social par des initiatives solidaires</li>
-            </ul>
-            <button type="button" className="home-action-btn" onClick={() => setCurrentPage('home')}>
-              Retour a l'accueil
-            </button>
-          </section>
+          <AboutSection onBack={() => setCurrentPage('home')} />
         )}
 
         {currentPage === 'contact' && (
@@ -410,8 +424,12 @@ function App() {
           <Events isAdmin={user.role === 'admin'} />
         )}
 
-        {currentPage === 'admin' && user.role === 'admin' && (
-          <Admin isAdmin={true} />
+        {currentPage === 'donations' && (
+          <Donations user={user} />
+        )}
+
+        {currentPage === 'admin' && (user.role === 'admin' || user.role === 'quiz_moderator') && (
+          <Admin role={user.role} />
         )}
       </main>
 
